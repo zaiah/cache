@@ -21,7 +21,8 @@ buildopts \
 	--all chain \
 	--short-if \
 	--summary "A database-less way to manage dependencies." \
-	--license mit
+	--license mit \
+	--library
 #	--at chain.sh \
 #	--make-exec
 

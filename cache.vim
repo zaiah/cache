@@ -1,11 +1,11 @@
 
-chain=/home/zaiah/projects/chain {
+cache=/home/zaiah/projects/cache {
  DEPENDENCIES
  EXAMPLE_MANIFEST
  README.md
  SPEC
- chain.sh
- chain.vim
+ cache.sh
+ cache.vim
  gen.sh
  initial_load.sh
  examples=examples {

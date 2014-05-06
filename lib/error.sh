@@ -11,6 +11,7 @@ error() {
 	local EXIT_CODE=
 	local DO_STDERR=
 	local VERBOSE=
+	local PREFIX="ERROR:"
 	
 	# error_usage - Show usage message and die with $STATUS
 	error_usage() {
@@ -22,6 +23,7 @@ error() {
 	-m | --message <arg>          Send an error message along with something.
 	-e | --exit <sig>             Exit with <sig> besides default code of 1.
 	-s | --stderr                 Use /dev/stderr as typical error handler.
+	-p | --program <name>         Die with program name.
 	-v | --verbose                Be verbose in output.
 	-h | --help                   Show this help and quit.
 	"
@@ -46,11 +48,16 @@ error() {
 				ERR_FILE="$1"
 	      ;;
 	     -e|--exit)
+			   DO_EXIT=true
 	         shift
 				EXIT_CODE="$1"
 	      ;;
 	     -s|--stderr)
 	         DO_STDERR=true
+	      ;;
+	     -p|--program)
+			  shift
+	        PREFIX="$1"
 	      ;;
 	     -v|--verbose)
 	        VERBOSE=true
@@ -72,7 +79,7 @@ error() {
 	[ ! -z $DO_STDERR ] && ERR_FILE="/dev/stderr"
 
 	# Display error message.
-	printf -- "%s\n" "$MESSAGE" >> $ERR_FILE
+	printf -- "%s\n" "${PREFIX}: $MESSAGE" >> $ERR_FILE
 
 	# Exit if this is a big deal.
 	[ ! -z $DO_EXIT ] && {
