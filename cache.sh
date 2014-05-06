@@ -92,13 +92,16 @@ Database stuff:
 -u, --update <arg>           Update a package. 
 -n, --needs <arg>            Set a dependence. 
 -x, --no-longer-needs <arg>  Unset a dependency. 
+--, --assess-needs <arg>     Set a dependence. 
 --, --needs <arg>            Set a dependence. 
---, --needs <arg>            Set a dependence. 
-    --load-needs <arg>      Load dependencies from a file. (Use --load-needs -help for more.) 
+-k, --link-to <arg>          Put a package somewhere.
+    --symlink-to <arg>       Put a package somewhere.
+    --link-ignore <arg>      Ignore these when linking out.
+    --git-ignore <arg>       Ignore these when committing.
 
-Package tuning:
+Parameter tuning:
 -q, --required <arg>         Which parameters are required when creating a package? 
--v, --version <arg>          Select or choose version. 
+    --version <arg>          Select or choose version. 
 -u, --uuid <arg>             Select by UUID. 
 -s, --summary <arg>          Select or choose summary. 
     --description <arg>      Select or choose description. 
@@ -111,10 +114,12 @@ Package tuning:
     --signature <arg>        Select or choose a signature. 
     --key <arg>              Select or choose a key. 
     --fingerprint <arg>      Select or choose a fingerprint.
-    --extra <arg>            
+    --extra <arg>            Supply key value pairs of whatever else 
+	                          should be tracked in a package. 
 
 General:
 -i, --info <pkg>             Display all information about a package.
+    --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
 -d, --directory              Where is an application's home directory? 
     --dist-info              Display information about how \`$PROGRAM\` is setup
@@ -142,6 +147,26 @@ do
          shift
          EXISTS="$1"
       ;;
+	  -k|--link-to)
+		   DO_LINK_TO=true
+			shift
+			LINK_TO="$1"
+		;;
+	  --symlink-to)
+		   DO_SYMLINK_TO=true
+			shift
+			LINK_TO="$1"
+		;;
+	  --git-ignore) 
+		   DO_GIT_IGNORE=true
+		   shift
+			save_igs "$1"
+		;;
+	  --link-ignore) 
+		   DO_LINK_IGNORE=true
+		   shift
+			save_igs "$1"
+		;;
      -r|--required)
          DO_REQUIRED=true
          shift
@@ -176,17 +201,17 @@ do
          shift
          save_deps "$1"
       ;;
-     --load-needs)
-         DO_LOAD_NEEDS=true
-         shift
-         LOAD_NEEDS="$1"
+     --list-needs)
+         DO_LIST_NEEDS=true
+			shift
+			BLOB="$1"
       ;;
      -s|--summary)
          DO_SUMMARY=true
          shift
          SUMMARY="$1"
       ;;
-     -v|--version)
+     --version)
          DO_VERSION=true
          shift
          save_args "VERSION=$1"
@@ -274,6 +299,11 @@ do
 		  shift
 		  BLOB="$1"
       ;;
+     --contents)
+        DO_DUMP_CONTENTS=true
+		  shift
+		  BLOB="$1"
+      ;;
      -l|--list)
         DO_LIST=true
       ;;
@@ -337,14 +367,14 @@ then
 	CACHE_DIR="${CACHE_DIR:-"$BINDIR/.${PROGRAM}/applications"}"
 
 	echo "
-CACHE_DIR="$CACHE_DIR"
-CACHE_DB="\$CACHE_DIR/.CACHE_DB"
-DEFAULT_VERSION=0.00
-FORMAT=DATESTAMP	# UUID, NONE, and CUSTOM are other choices.
+CACHE_DIR=\"$CACHE_DIR\"
+CACHE_DB=\"\$CACHE_DIR/.CACHE_DB\"
+DEFAULT_VERSION=0.01
+COPY_TYPE=LINKED                 # LINKED, STATIC
+FORMAT=DATESTAMP						# UUID, NONE, and CUSTOM are other choices.
 FORMAT_CUSTOM=
 REMOTE_URL_ROOT=$REMOTE_URL_ROOT
 REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
-
 fi
 
 
@@ -364,6 +394,20 @@ source $CACHE_CONFIG
 
 	# Show the folder.
   	printf "%s\n" "$CACHE_DIR/$FOLDER" 
+}
+
+
+# Dump contents
+[ ! -z $DO_DUMP_CONTENTS ] && {
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
+
+	# List everything out.
+	ls $CACHE_DIR/$FOLDER
 }
 
 
@@ -412,22 +456,44 @@ source $CACHE_CONFIG
 		# CUSTOM) FORMAT="$(date +%F).$(date +%s)" ;;
 	esac
 
-	# Common vars.
+	# Common vars and files.
 	FOLDER="$CACHE_DIR/${BLOB}.${FORMAT}"
 	DEPENDENCIES="$FOLDER/DEPENDENCIES"
 	MANIFEST="$FOLDER/MANIFEST"
 	VERSIONS="$FOLDER/VERSIONS"
+	INFO="$FOLDER/INFO"
+	INSTALL="$FOLDER/INSTALL"
+	README="$FOLDER/README"
+	GITIGNORE="$FOLDER/.gitignore"
+	RSYNCIGNORE="$FOLDER/.rsyncignore"
+	LINKIGNORE="$FOLDER/.linkignore"
+
+	FILE_ARR=(
+		"$FOLDER" 
+		"$DEPENDENCIES" 
+		"$MANIFEST" 
+		"$VERSIONS" 
+		"$INFO" 
+		"$INSTALL" 
+		"$README"
+		"$GITIGNORE"
+		"$RSYNCIGNORE"
+		"$LINKIGNORE"
+	)
 
 	# If the folder doesn't exist already, then create it.
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
 
-	# Make a file for dependencies too, and authors, etc.
-	[ ! -d "$DEPENDENCIES" ] && touch $DEPENDENCIES
+	# Make all the needed files.
+	for F in ${FILE_ARR[@]}
+	do
+		[ ! -f "$F" ] && touch $F
+	done
 
 	# Put this manifest somewhere.
 	{
 		echo " 
-VERSION=$VERSION
+VERSION=${VERSION-$DEFAULT_VERSION}
 UUID=$UUID
 DESCRIPTION='$DESCRIPTION'
 SUMMARY='$SUMMARY'
@@ -486,31 +552,22 @@ FINGERPRINT=$FINGERPRINT
 
 	# Load them all variables first. 
 	tmp_file -n JELLY
-	# printf "$SVAR" > $JELLY
 	printf "$SVAR\n" > $JELLY
-#	cat $JELLY
-#	exit
+
 	# Go over each.
 	while read line 
 	do
 		# Get the matching thing.
-		# sed -n "/^[A-Z].*=/p"
-#		sed "s/^\([A-Z].*\)=.*/\1/" | {
 		TERM=`printf "$line" | awk -F '=' '{ print $1 }'` 
 		VALUE=`printf "$line" | awk -F '=' '{ print $2 }'` 
 
-		# Make sure that no /'s exist, so that the replacement will work.
-
-		# 
+		# Run replacements.
 		if [ ! -z "`sed -n "/^${TERM}=/p" $MANIFEST`" ] 
 		then
 			# Run a permanent replacement with sed.
-			sed -i "s/^\(${TERM}=\).*/\1\"${VALUE}\"/" $MANIFEST
-			# sed "s/^\(${TERM}=\).*/\1\"${VALUE}\"/" $MANIFEST
-
-		# Just append it otherwise.
+			sed -i "s|^\(${TERM}=\).*|\1\"${VALUE}\"|" $MANIFEST
 		else
-			# printf -- "%s\n" "${TERM}=\"${VALUE}\""  # >> $MANIFEST
+			# Just append it otherwise.
 			printf -- "%s\n" "${TERM}=\"${VALUE}\""  >> $MANIFEST
 		fi
 	done < $JELLY
@@ -615,26 +672,88 @@ FINGERPRINT=$FINGERPRINT
 }
 
 
-# load_needs (Load the dependencies from some file.)
-[ ! -z $DO_LOAD_NEEDS ] && {
-	# Show help.
-	[[ $DEP_FILE == "-help" ]] && {
-		echo "
-		" > /dev/stdout
-	}
+# list needs (list the dependencies for a file)
+[ ! -z $DO_LIST_NEEDS ] && { 
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
 
-	# Otherwise, load some files.
-	[ -f "$DEP_FILE" ] && {
-   	printf '' > /dev/null
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
 
-	}
+	# Find dependencies
+	DEPENDENCIES="$CACHE_DIR/$FOLDER/DEPENDENCIES"
+	[ ! -f $DEPENDENCIES ] && error -e 1 -m "No file found for dependency tracking.\nPerhaps this file had no dependencies?\n" -p "cache"
+
+	# List them out.
+	LIST=`cat $DEPENDENCIES | sed '/^$/d'`
+	COUNT=`cat $DEPENDENCIES | sed '/^$/d' | wc -l`
+	
+	if [ $COUNT -gt 1 ] 
+	then 
+		printf "$COUNT dependencies found for '$BLOB':\n"
+	elif [ $COUNT -eq 1 ]
+	then 
+		printf "$COUNT dependency found for '$BLOB':\n"
+	fi
+	cat $DEPENDENCIES
 }
 
-# list needs (list the dependencies for a file)
-[ ! -z $DO_LIST_NEEDS ] && { printf '' > /dev/null; }
 
 # assess needs (are all the dependencies on this system?)
 [ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
+
+
+# Link to
+[ ! -z $DO_LINK_TO ] || [ ! -z $DO_SYMLINK_TO ] && {
+  	# Make sure an application and destination directory has been specified.
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+	[ -z "$LINK_TO" ] && error -e 1 -m "No location specified for linking." -p "cache"
+
+	# Make sure the application exists.
+	not_exists "$BLOB"
+
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
+
+	# Expand the directory if not absolute.
+	LINK_TO=`get_fullpath $LINK_TO`
+
+	# Error out if the folder exists.
+	[ -d "$LINK_TO" ] && {
+		error -e 1 -m "'$LINK_TO' already exists.\nNot relinking." -p "cache"
+	}
+
+	# Run the linking.
+	BLOB_ROOT="$CACHE_DIR/$FOLDER"
+
+	# Set linking flags.
+	[ ! -z $VERBOSE ] && LN_FLAGS="-v" || LN_FLAGS=
+	[ ! -z $DO_SYMLINK_TO ] && LN_FLAGS="-s $LN_FLAGS" 
+
+	# Get a full directory listing.  -print0?
+	for LINK_FILE in `find $BLOB_ROOT | grep -v '.git'` 
+	do
+		# Move through each file and make sure that it doesn't match what
+		# you want excluded.
+
+		# Define a relative root.
+		RELATIVE_ROOT=`printf "%s" $LINK_FILE | sed "s#$BLOB_ROOT##"`
+
+		# Make any directories.
+		[ -d "$LINK_FILE" ] && {
+			mkdir $MKDIR_FLAGS $LINK_TO/$RELATIVE_ROOT
+			continue
+		}
+
+		# Hard link any files.
+		[ -f "$LINK_FILE" ] && {
+			ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
+			continue
+		}
+	done
+}
 
 # Wipe any open temporary files.
 tmp_file -w

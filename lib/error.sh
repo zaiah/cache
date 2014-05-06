@@ -79,7 +79,7 @@ error() {
 	[ ! -z $DO_STDERR ] && ERR_FILE="/dev/stderr"
 
 	# Display error message.
-	printf -- "%s\n" "${PREFIX}: $MESSAGE" >> $ERR_FILE
+	printf -- "${PREFIX}: $MESSAGE\n" >> $ERR_FILE
 
 	# Exit if this is a big deal.
 	[ ! -z $DO_EXIT ] && {
