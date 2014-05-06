@@ -114,12 +114,11 @@ Package tuning:
     --extra <arg>            
 
 General:
--i, --interpret              Interpret the manifest file for a package.
+-i, --info <pkg>             Display all information about a package.
 -l, --list                   List all packages.
-    --file                   Where is the default file? 
-    --folder                 Where is the default folder? 
+-d, --directory              Where is an application's home directory? 
     --default                What is the default (?)?
-    --info                   Show me additional information.
+    --dist-info              Display information about how \`$PROGRAM\` is setup
     --install <arg>          Install this to a certain location. 
     --uninstall              Uninstall this. 
 -v, --verbose                Be verbose in output.
@@ -198,7 +197,7 @@ do
          shift
          UUID="$1"
       ;;
-     -d|--description)
+     --description)
          DO_DESCRIPTION=true
          shift
 			save_args "DESCRIPTION=$1"
@@ -213,10 +212,10 @@ do
          shift
          save_args "NAMESPACE=$1"
       ;;
-     -f|--filename)
-         DO_FILENAME=true
+     -f|--archive)
+         DO_ARCHIVE=true
          shift
-         save_args "FILENAME=$1"
+         save_args "ARCHIVE=$1"
       ;;
      -u|--url)
          DO_URL=true
@@ -269,13 +268,15 @@ do
      --file)
          DO_FILE=true
       ;;
-     --folder)
+     -d|--dir|--directory)
          DO_FOLDER=true
+			shift
+			BLOB="$1"
       ;;
      --default)
          DO_DEFAULT=true
       ;;
-     -i|--interpret)
+     -i|--info)
         DO_INTERPRET=true
 		  shift
 		  BLOB="$1"
@@ -359,26 +360,27 @@ source $CACHE_CONFIG
 
 
 # Basic information...
-# file
-[ ! -z $DO_FILE ] && {
-   printf '' > /dev/null
-}
 # folder
 [ ! -z $DO_FOLDER ] && {
-   printf '' > /dev/null
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
+
+	# Show the folder.
+  	printf "%s\n" "$CACHE_DIR/$FOLDER" 
 }
 
-# required
-[ ! -z $DO_REQUIRED ] && {
-   printf '' > /dev/null
-}
 
 # List 
 [ ! -z $DO_LIST ] && {
-	awk -F '|' '{
+	awk -v "cache_dir=$CACHE_DIR" -F '|' '{
 		print "App Name:      " $2
 		print "App ID:        " $1
 		print "App Location:  " $3
+		print "Full Path:     " cache_dir"/"$3
 		print "\n"
 	}' $CACHE_DB 
 }
@@ -389,6 +391,12 @@ source $CACHE_CONFIG
 [ ! -z $DO_EXISTS ] && {
 	exists $BLOB
 }
+
+# required
+[ ! -z $DO_REQUIRED ] && {
+   printf '' > /dev/null
+}
+
 
 # create
 [ ! -z $DO_CREATE ] && {
@@ -431,8 +439,8 @@ DESCRIPTION='$DESCRIPTION'
 SUMMARY='$SUMMARY'
 TITLE='$TITLE'
 NAMESPACE=$NAMESPACE
-FILENAME=$BLOB
 URL=$URL
+ARCHIVE=$ARCHIVE
 PRODUCED_ON=$PRODUCED_ON
 AUTHORS=$AUTHORS
 SIGNATURE=$SIGNATURE
@@ -496,6 +504,10 @@ FINGERPRINT=$FINGERPRINT
 #		sed "s/^\([A-Z].*\)=.*/\1/" | {
 		TERM=`printf "$line" | awk -F '=' '{ print $1 }'` 
 		VALUE=`printf "$line" | awk -F '=' '{ print $2 }'` 
+
+		# Make sure that no /'s exist, so that the replacement will work.
+
+		# 
 		if [ ! -z "`sed -n "/^${TERM}=/p" $MANIFEST`" ] 
 		then
 			# Run a permanent replacement with sed.
@@ -531,13 +543,16 @@ FINGERPRINT=$FINGERPRINT
 	do
 		[ ! -z "$line" ] && {
 			printf "%s" "$line" | \
-				awk -F '=' '{ print $1 }' | \
-				tr '[A-Z]' '[a-z]' | \
-				sed 's/_/ /' | \
-				sed 's/^[a-z]/\u&/' | \
-				sed 's/$/:/'
+				sed 's/=/:/g' | awk -F ':' '{
+					printf "%-15s %s\n", $1":", $2
+				}'
+#				awk -F '=' '{ print $1 }' | \
+#				tr '[A-Z]' '[a-z]' | \
+#				sed 's/_/ /g' | \
+#				sed 's/^[a-z]/\u&/' | \
+#				sed 's/$/:/'
 
-			printf "%s" "$line" | awk -F '=' '{ print $2 }' 
+#			printf "%s" "$line" | awk -F '=' '{ print $2 }' 
 		}
 	done < $MANIFEST
 }
