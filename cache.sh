@@ -68,15 +68,15 @@ not_exists() {
 }
 
 
+# This can be cleaner...
 SVAR=
 save_args() {
 	SVAR="$SVAR\n$1"	
 }
 
-
-# Must eat the arguments and spit back out...
-optexpander() {
-	printf '' > /dev/null
+DVAR=
+save_deps() {
+	DVAR="$DVAR\n$1"	
 }
 
 
@@ -103,7 +103,7 @@ Package tuning:
 -s, --summary <arg>          Select or choose summary. 
     --description <arg>      Select or choose description. 
 -t, --title <arg>            Select or choose title. 
--n, --namespace <arg>        Select or choose name. 
+    --namespace <arg>        Select or choose name. 
 -f, --filename <arg>         Select by filename. 
 -u, --url <arg>              Select or choose by URL 
     --produced-on <arg>      Select a date.
@@ -117,7 +117,6 @@ General:
 -i, --info <pkg>             Display all information about a package.
 -l, --list                   List all packages.
 -d, --directory              Where is an application's home directory? 
-    --default                What is the default (?)?
     --dist-info              Display information about how \`$PROGRAM\` is setup
     --install <arg>          Install this to a certain location. 
     --uninstall              Uninstall this. 
@@ -170,12 +169,12 @@ do
      -n|--needs)
          DO_NEEDS=true
          shift
-         NEEDS="$1"
+         save_deps "$1"
       ;;
-     -n|--no-longer-needs)
+     -x|--no-longer-needs)
          DO_NO_LONGER_NEEDS=true
          shift
-         NO_LONGER_NEEDS="$1"
+         save_deps "$1"
       ;;
      --load-needs)
          DO_LOAD_NEEDS=true
@@ -265,16 +264,10 @@ do
      --uninstall)
          DO_UNINSTALL=true
       ;;
-     --file)
-         DO_FILE=true
-      ;;
      -d|--dir|--directory)
          DO_FOLDER=true
 			shift
 			BLOB="$1"
-      ;;
-     --default)
-         DO_DEFAULT=true
       ;;
      -i|--info)
         DO_INTERPRET=true
@@ -319,7 +312,7 @@ done
 # install
 [ ! -z $DO_INSTALL ] && {
 	# Check for missing stuff.
-  	init --fatal-if-missing "git,sed,awk,mkdir" 
+  	init --fatal-if-missing "git,grep,sed,awk,mkdir" 
 
 	# Populate the $CONFIG file.
 	init --write "CONFIG=$HOME/.cache"
@@ -423,6 +416,7 @@ source $CACHE_CONFIG
 	FOLDER="$CACHE_DIR/${BLOB}.${FORMAT}"
 	DEPENDENCIES="$FOLDER/DEPENDENCIES"
 	MANIFEST="$FOLDER/MANIFEST"
+	VERSIONS="$FOLDER/VERSIONS"
 
 	# If the folder doesn't exist already, then create it.
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
@@ -546,21 +540,13 @@ FINGERPRINT=$FINGERPRINT
 				sed 's/=/:/g' | awk -F ':' '{
 					printf "%-15s %s\n", $1":", $2
 				}'
-#				awk -F '=' '{ print $1 }' | \
-#				tr '[A-Z]' '[a-z]' | \
-#				sed 's/_/ /g' | \
-#				sed 's/^[a-z]/\u&/' | \
-#				sed 's/$/:/'
-
-#			printf "%s" "$line" | awk -F '=' '{ print $2 }' 
 		}
 	done < $MANIFEST
-}
 
-
-# Commit
-[ ! -z $DO_COMMIT ] && {
-   printf '' > /dev/null
+	# Show the dependencies too.
+	DEPENDENCIES="$CACHE_DIR/$FOLDER/DEPENDENCIES"
+	printf "Depends On:\n"
+	cat $DEPENDENCIES
 }
 
 
@@ -570,17 +556,64 @@ FINGERPRINT=$FINGERPRINT
 	# Check that the file being asked to depend on exists.
 	# One at a time for now.
 
-	# Set the dependence from here.
-   printf '' > /dev/null
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+	[ -z "$DVAR" ] && error -e 1 -m "No dependencies specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
+
+	# Define the manifest
+	DEPENDENCIES="$CACHE_DIR/$FOLDER/DEPENDENCIES"
+	[ ! -f $DEPENDENCIES ] && touch $DEPENDENCIES
+
+	# Track dependents
+	tmp_file -n DEPS
+	printf "$DVAR\n" > $DEPS
+
+	# Check that each dependency exists. 
+	while read line
+	do
+		# If something doesn't exist, shut down and don't append.
+		not_exists $line
+
+		# Check if that line is already there.
+		[ -z "`sed -n "/^${line}/p" $DEPENDENCIES`" ] && {
+			printf -- "%s\n" "$line"  >> $DEPENDENCIES
+		}
+	done < $DEPS
 }
+
 
 # no_longer_needs
 [ ! -z $DO_NO_LONGER_NEEDS ] && {
-   printf '' > /dev/null
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+	[ -z "$DVAR" ] && error -e 1 -m "No dependencies specified." -p "cache"
 
-	# Remove from the file based database.
- 	sed -i ${LINE}d $CACHE_DB
+	# Is it there?
+	not_exists $BLOB
+
+	# Define the manifest
+	DEPENDENCIES="$CACHE_DIR/$FOLDER/DEPENDENCIES"
+	[ ! -f $DEPENDENCIES ] && error -e 1 -m "No file found for dependency tracking.\nPerhaps this file had no dependencies?\n" -p "cache"
+
+	# Track dependents
+	tmp_file -n DEPS
+	printf "$DVAR\n" > $DEPS
+
+	# Check that each dependency exists. 
+	while read line
+	do
+		# Find entry and delete it.
+		sed -i "/^${line}$/d" $DEPENDENCIES
+	done < $DEPS
 }
+
 
 # load_needs (Load the dependencies from some file.)
 [ ! -z $DO_LOAD_NEEDS ] && {
@@ -603,24 +636,5 @@ FINGERPRINT=$FINGERPRINT
 # assess needs (are all the dependencies on this system?)
 [ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
 
-
-## Parameters
-# version
-[ ! -z $VERSION ] && { printf '' > /dev/null; }
-
-# description
-[ ! -z "$DESCRIPTION" ] && { printf '' > /dev/null; }
-[ ! -z "$SUMMARY" ] && { printf '' > /dev/null; }
-[ ! -z $TITLE ] && { printf '' > /dev/null; }
-[ ! -z $NAMESPACE ] && { printf '' > /dev/null; }
-[ ! -z $FILENAME ] && { printf '' > /dev/null; }
-[ ! -z $URL ] && { printf '' > /dev/null; }
-[ ! -z $PRODUCED_ON ] && { printf '' > /dev/null; }
-[ ! -z $AUTHORS ] && { printf '' > /dev/null; }
-[ ! -z $SIGNATURE ] && { printf '' > /dev/null; }
-[ ! -z $KEY ] && { printf '' > /dev/null; }
-[ ! -z $FINGERPRINT ] && { printf '' > /dev/null; }
-[ ! -z $EXTRA ] && { printf '' > /dev/null; }
-
-
-
+# Wipe any open temporary files.
+tmp_file -w
