@@ -68,10 +68,45 @@ not_exists() {
 }
 
 
-# This can be cleaner...
+# Ignore certain items.
 SVAR=
+DVAR=
+GIVAR=
+LIVAR=
+EVAR=
+
 save_args() {
-	SVAR="$SVAR\n$1"	
+	while [ $# -gt 0 ]
+	do
+		case "$1" in
+			-args) shift; SVAR="$SVAR\n$1";;
+			-deps) shift; DVAR="$DVAR\n$1";;
+			-gi) 	shift; GIVAR="$GIVAR\n$1";;
+			-li) 	shift; LIVAR="$LIVAR\n$1";;
+			-ex) 	shift; EVAR="$EVAR\n$1";;
+			-dump)
+				shift
+				local TERM=
+				case "$1" in
+					args) TERM="$SVAR" ;;
+					deps) TERM="$DVAR" ;;
+					gi) TERM="$GIVAR" ;;
+					li) TERM="$LIVAR" ;;
+					ex) TERM="$EVAR" ;;
+					*) error -e 1 \
+						-m "Incorrect item given to save_args -dump." \
+						-p "cache: DEVELOPER ERROR"
+					;;
+				esac
+				# local ARGDUMP=`random -f -l 6 | tr '[0-9]' '_' | sed 's/+/_/g'`
+				tmp_file -n ARGDUMP
+				printf "$TERM\n" > $ARGDUMP
+				printf "$ARGDUMP"
+			;;
+		esac
+	shift
+	done
+#	SVAR="$SVAR\n$1"	
 }
 
 DVAR=
@@ -88,12 +123,14 @@ usage() {
 Database stuff:
 -e, --exists <arg>           Does this file exist? 
 -c, --create <arg>           Add a package. 
+    --mkdir <arg>            Make additional directories. 
+    --touch <arg>            Create additional files.
 -r, --remove <arg>           Remove a package. 
 -u, --update <arg>           Update a package. 
+-m, --commit <arg>           Commit changes to a package.
 -n, --needs <arg>            Set a dependence. 
 -x, --no-longer-needs <arg>  Unset a dependency. 
---, --assess-needs <arg>     Set a dependence. 
---, --needs <arg>            Set a dependence. 
+    --list-needs <arg>            Set a dependence. 
 -k, --link-to <arg>          Put a package somewhere.
     --symlink-to <arg>       Put a package somewhere.
     --link-ignore <arg>      Ignore these when linking out.
@@ -105,7 +142,7 @@ Parameter tuning:
 -u, --uuid <arg>             Select by UUID. 
 -s, --summary <arg>          Select or choose summary. 
     --description <arg>      Select or choose description. 
--t, --title <arg>            Select or choose title. 
+    --title <arg>            Select or choose title. 
     --namespace <arg>        Select or choose name. 
 -f, --filename <arg>         Select by filename. 
 -u, --url <arg>              Select or choose by URL 
@@ -160,12 +197,12 @@ do
 	  --git-ignore) 
 		   DO_GIT_IGNORE=true
 		   shift
-			save_igs "$1"
+			save_args -gi "$1"
 		;;
 	  --link-ignore) 
 		   DO_LINK_IGNORE=true
 		   shift
-			save_igs "$1"
+			save_args -li "$1"
 		;;
      -r|--required)
          DO_REQUIRED=true
@@ -194,12 +231,12 @@ do
      -n|--needs)
          DO_NEEDS=true
          shift
-         save_deps "$1"
+         save_args -deps "$1"
       ;;
      -x|--no-longer-needs)
          DO_NO_LONGER_NEEDS=true
          shift
-         save_deps "$1"
+         save_args -deps "$1"
       ;;
      --list-needs)
          DO_LIST_NEEDS=true
@@ -214,7 +251,7 @@ do
      --version)
          DO_VERSION=true
          shift
-         save_args "VERSION=$1"
+         save_args -args "VERSION=$1"
       ;;
      -u|--uuid)
          DO_UUID=true
@@ -224,57 +261,57 @@ do
      --description)
          DO_DESCRIPTION=true
          shift
-			save_args "DESCRIPTION=$1"
+			save_args -args "DESCRIPTION=$1"
       ;;
      -t|--title)
          DO_TITLE=true
          shift
-         save_args "TITLE=$1"
+         save_args -args "TITLE=$1"
       ;;
      -n|--namespace)
          DO_NAMESPACE=true
          shift
-         save_args "NAMESPACE=$1"
+         save_args -args "NAMESPACE=$1"
       ;;
      -f|--archive)
          DO_ARCHIVE=true
          shift
-         save_args "ARCHIVE=$1"
+         save_args -args "ARCHIVE=$1"
       ;;
      -u|--url)
          DO_URL=true
          shift
-         save_args "URL=$1"
+         save_args -args "URL=$1"
       ;;
      --produced-on)
          DO_PRODUCED_ON=true
          shift
-         save_args "PRODUCED_ON=$1"
+         save_args -args "PRODUCED_ON=$1"
       ;;
      --authors)
          DO_AUTHORS=true
          shift
-         save_args "AUTHORS=$1"
+         save_args -args "AUTHORS=$1"
       ;;
      --primary-author)
          DO_AUTHORS=true
          shift
-         save_args "PRIMARY_AUTHOR=$1"
+         save_args -args "PRIMARY_AUTHOR=$1"
       ;;
      --signature)
          DO_SIGNATURE=true
          shift
-         save_args "SIGNATURE=$1"
+         save_args -args "SIGNATURE=$1"
       ;;
      --key)
          DO_KEY=true
          shift
-         save_args "KEY=$1"
+         save_args -args "KEY=$1"
       ;;
      --fingerprint)
          DO_FINGERPRINT=true
          shift
-         save_args "FINGERPRINT=$1"
+         save_args -args "FINGERPRINT=$1"
       ;;
      --extra)
          DO_EXTRA=true
@@ -316,16 +353,36 @@ do
 	  --echo)
 		  
 		;;
+	  --test)
+		  shift
+		  case "$1" in 
+			  args) TEST=args;;
+			  deps) TEST=deps;;
+			  gi) TEST=gi;;
+			  li) TEST=li;;
+			  ex) TEST=ex;;
+	     esac
+		  save_args -dump $TEST | { 
+				FN=`cat /dev/stdin`
+				while read line 
+				do
+					[ ! -z "$line" ] && echo $line
+				done < $FN
+		  }
+		  exit
+		;;
 	  --reset)
 		  	source $BINDIR/.CACHE
 			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
 			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
+			exit
 		;;
 	  --total-reset)
 		  	source $BINDIR/.CACHE
 			init --uninstall
 			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
 			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
+			exit
 		;;
      --) break;;
      -*)
@@ -481,19 +538,22 @@ source $CACHE_CONFIG
 		"$LINKIGNORE"
 	)
 
+	DIR_ARR=(
+		"$FOLDER/src"
+		"$FOLDER/tests"
+		"$FOLDER/docs"
+	)
+
 	# If the folder doesn't exist already, then create it.
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
 
-	# Make all the needed files.
-	for F in ${FILE_ARR[@]}
-	do
-		[ ! -f "$F" ] && touch $F
-	done
+	# Make all the needed files and folders.
+	for F in ${FILE_ARR[@]}; do [ ! -f "$F" ] && touch $F; done
+	for D in ${DIR_ARR[@]}; do [ ! -d "$D" ] && mkdir -pv $D; done
 
 	# Put this manifest somewhere.
 	{
-		echo " 
-VERSION=${VERSION-$DEFAULT_VERSION}
+		echo "VERSION=${VERSION-$DEFAULT_VERSION}
 UUID=$UUID
 DESCRIPTION='$DESCRIPTION'
 SUMMARY='$SUMMARY'
@@ -505,8 +565,7 @@ PRODUCED_ON=$PRODUCED_ON
 AUTHORS=$AUTHORS
 SIGNATURE=$SIGNATURE
 KEY=$KEY
-FINGERPRINT=$FINGERPRINT
-"
+FINGERPRINT=$FINGERPRINT"
 	} > $MANIFEST
 
 	# Does file exist in database?
