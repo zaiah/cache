@@ -667,7 +667,6 @@ FINGERPRINT=$FINGERPRINT"
 	} > $VERSIONS
 
 
-	# #1
 	# Finally, start with the version control madness.
 	cd $FOLDER
 	git init
@@ -677,17 +676,6 @@ FINGERPRINT=$FINGERPRINT"
 	git branch "$CURRENT_VERSION"		
 	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
 	cd $CURRENT_PATH
-
-	# #2
-	# Finally, start with the version control madness.
-#	cd $FOLDER
-#	git init
-#	git add .
-#	GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
-#	git commit -m "cache_$GIT_ID committed on `date`"
-#	git branch "$GIT_ID"		
-#	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
-#	cd -
 }
 
 
