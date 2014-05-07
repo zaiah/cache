@@ -156,6 +156,7 @@ Parameter tuning:
 
 General:
     --set-cache-dir <arg>    Set the cache directory to <arg>
+    --cd <arg>               Use <arg> as the current cache directory.
 -i, --info <pkg>             Display all information about a package.
     --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
@@ -334,6 +335,11 @@ do
       ;;
      --dist-info)
          DO_DIST_INFO=true
+      ;;
+     --cd)
+         DO_CHANGE_DIR=true
+			shift
+			CHANGED_DIR="$1"
       ;;
      -d|--dir|--directory)
          DO_FOLDER=true
