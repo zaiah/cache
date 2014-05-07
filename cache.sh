@@ -68,6 +68,20 @@ not_exists() {
 }
 
 
+#------------------------------------------------------
+# up  - auto increment by one
+# down - auto decrement by one
+# now - static version declaration
+#-----------------------------------------------------#
+version() {
+	case "$1" in
+		up) sed 's/\(VERSION=\).*/\1';;
+		down) ;;
+		now) ;;
+	esac
+}
+
+
 # Ignore certain items.
 SVAR=
 DVAR=
@@ -135,6 +149,7 @@ Database stuff:
     --symlink-to <arg>       Put a package somewhere.
     --link-ignore <arg>      Ignore these when linking out.
     --git-ignore <arg>       Ignore these when committing.
+    --uninit <arg>           Remove all tracking information from git.
 
 Parameter tuning:
     --version <arg>          Select or choose version. 
@@ -211,6 +226,11 @@ do
 		   shift
 			BLOB="$1"
 		;;
+     -m|--commit)
+         DO_COMMIT=true
+         shift
+         BLOB="$1"
+      ;;
      -c|--create)
          DO_CREATE=true
          shift
@@ -635,6 +655,36 @@ FINGERPRINT=$FINGERPRINT"
 		printf "$TITLE|"
 		printf "`basename $FOLDER`\n"
 	} >> $CACHE_DB
+
+	# Add some version information (we always assume this is the first one).
+	CURRENT_VERSION=`rand`
+	{ 
+		printf "001|"
+		printf "`rand`"
+	} > $VERSIONS
+
+
+	# #1
+	# Finally, start with the version control madness.
+	cd $FOLDER
+	git init
+	git add .
+	GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
+	git commit -m "cache_$CURRENT_VERSION committed on `date`"
+	git branch "$CURRENT_VERSION"		
+	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
+	cd -
+
+	# #2
+	# Finally, start with the version control madness.
+#	cd $FOLDER
+#	git init
+#	git add .
+#	GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
+#	git commit -m "cache_$GIT_ID committed on `date`"
+#	git branch "$GIT_ID"		
+#	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
+#	cd -
 }
 
 
@@ -690,6 +740,41 @@ FINGERPRINT=$FINGERPRINT"
 			printf -- "%s\n" "${TERM}=\"${VALUE}\""  >> $MANIFEST
 		fi
 	done < $JELLY
+}
+
+
+# Commit
+# 1. add a branch corresponding to the version, just stash changes so that they don't get lost.
+# 2. Or commit to that new branch.
+[ ! -z $DO_COMMIT ] && {
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`
+
+	# Define the manifest
+	VERSIONS="$CACHE_DIR/$FOLDER/VERSIONS"
+
+	# #2
+	# Automatically stash the changes and commit a new version.
+	# git stash
+	CURRENT_VERSION=`rand`
+	{ 
+		printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
+		printf "$CURRENT_VERSION\n|"
+		printf "$VERSION_NAME\n"
+	} >> $VERSIONS
+	git add .
+	git branch $CURRENT_VERSION
+	#CURRENT_VERSION git stash?
+	git checkout $CURRENT_VERSION
+	git commit -m "cache $CURRENT_VERSION - `date`"
+	git checkout master
 }
 
 
