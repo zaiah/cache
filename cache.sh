@@ -318,6 +318,11 @@ do
          shift
          EXTRA="$1"
       ;;
+     --set-cache-dir)
+         DO_SET_CACHE_DIR=true
+		   shift
+         CACHE_DIR="$1"
+      ;;
      --install)
          DO_INSTALL=true
          shift
@@ -415,12 +420,27 @@ done
 }
 
 
+
 # Generate a .CACHE file.
 CACHE_CONFIG="$BINDIR/.CACHE"
 if [ ! -f "$CACHE_CONFIG" ]
 then
+	# Set a cache directory first.
+	[ ! -z $DO_SET_CACHE_DIR ] && {
+		# Was a cache directory given?
+		[ -z "$CACHE_DIR" ] && error -e 1 -m "No cache directory specified."
+
+		# Get the fullpath.
+		CACHE_DIR=`get_fullpath $CACHE_DIR`
+
+		# Make the directory.
+		mkdir $CACHE_DIR
+		exit
+	}
+
 	REMOTE_URL_ROOT=${REMOTE_URL_ROOT}
 	REMOTE_GLOBAL_KEY=${REMOTE_GLOBAL_KEY}
+	echo $CACHE_DIR
 	CACHE_DIR="${CACHE_DIR:-"$BINDIR/.${PROGRAM}/applications"}"
 
 	echo "
