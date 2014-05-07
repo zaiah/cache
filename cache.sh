@@ -36,6 +36,9 @@ SELF="$(readlink -f $0)"
 source $BINDIR/lib/__.sh
 
 
+# Extra stuff.
+CURRENT_PATH="`pwd`"
+
 # Fetch a random number out of nowhere.
 rand() { random -l 40 | sed 's#/#_#g' | sed 's#=#+#g'; }
 
@@ -673,7 +676,7 @@ FINGERPRINT=$FINGERPRINT"
 	git commit -m "cache_$CURRENT_VERSION committed on `date`"
 	git branch "$CURRENT_VERSION"		
 	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
-	cd -
+	cd $CURRENT_PATH
 
 	# #2
 	# Finally, start with the version control madness.
@@ -754,11 +757,11 @@ FINGERPRINT=$FINGERPRINT"
 	not_exists $BLOB
 
 	# Find entry.
-	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
-		awk -F ':' '{ print $4 }'`
+	CURRENT_PATH="`pwd`"
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
 
 	# Define the manifest
-	VERSIONS="$CACHE_DIR/$FOLDER/VERSIONS"
+	VERSIONS="$FOLDER/VERSIONS"
 
 	# #2
 	# Automatically stash the changes and commit a new version.
@@ -769,12 +772,15 @@ FINGERPRINT=$FINGERPRINT"
 		printf "$CURRENT_VERSION\n|"
 		printf "$VERSION_NAME\n"
 	} >> $VERSIONS
+
+	cd $FOLDER
 	git add .
 	git branch $CURRENT_VERSION
 	#CURRENT_VERSION git stash?
 	git checkout $CURRENT_VERSION
 	git commit -m "cache $CURRENT_VERSION - `date`"
 	git checkout master
+	cd $CURRENT_PATH
 }
 
 
