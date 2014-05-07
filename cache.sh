@@ -453,10 +453,10 @@ CACHE_CONFIG="$BINDIR/.CACHE"
 		OLD_CACHE_DIR=`sed -n '/^CACHE_DIR=/p' $CACHE_CONFIG | sed "s/^CACHE_DIR=//"`
 
 		# Move the old data to the new directory.
-		# [ -d "$OLD_CACHE_DIR" ] && echo "AAAAH!!!" 
 		[ -d "$OLD_CACHE_DIR" ] && {
 			mv -v $OLD_CACHE_DIR/* $CACHE_DIR
 			mv -v $OLD_CACHE_DIR/.CACHE_DB $CACHE_DIR/.CACHE_DB
+			rmdir -pv $OLD_CACHE_DIR 2>/dev/null  # Only removes empty dirs...
 		}
 
 		# Update the configuration file.
