@@ -36,12 +36,20 @@ function get_fullpath() {
 		# If name contains linux, then use readlink -f
 		if [[ "$osname" =~ "LINUX" ]]
 		then
-			# If it's a directory we do something else.
-			if [[ "$1" =~ "/" ]] && [[ ! "$1" =~ '.' ]]
+			# echo "Unmodified Path: $1" > /dev/stderr
+
+			# Assume an absolute path. 
+			if [[ "${1:0:1}" == "/" ]]
+			then
+				printf "%s" "$1" 
+
+			# Assume a relative path that needs translation.
+			elif [[ "$1" =~ "/" ]] && [[ ! "$1" =~ '.' ]]
 			then
 				printf "%s" $(pwd)/$1
+
+			# Assume a relative path with trickiness.
 			else
-				# Handle a symbolic link more effectively.
 				readlink -f "$1" 
 			fi
 

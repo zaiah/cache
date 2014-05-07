@@ -137,7 +137,6 @@ Database stuff:
     --git-ignore <arg>       Ignore these when committing.
 
 Parameter tuning:
--q, --required <arg>         Which parameters are required when creating a package? 
     --version <arg>          Select or choose version. 
 -u, --uuid <arg>             Select by UUID. 
 -s, --summary <arg>          Select or choose summary. 
@@ -156,7 +155,9 @@ Parameter tuning:
 
 General:
     --set-cache-dir <arg>    Set the cache directory to <arg>
+    --required <arg>         Define parameters required when creating a package.
     --cd <arg>               Use <arg> as the current cache directory.
+	                          (Will fail if .CACHE_DB is not there.)
 -i, --info <pkg>             Display all information about a package.
     --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
@@ -184,7 +185,7 @@ do
      -e|--exists)
          DO_EXISTS=true
          shift
-         EXISTS="$1"
+         BLOB="$1"
       ;;
 	  -k|--link-to)
 		   DO_LINK_TO=true
@@ -206,11 +207,6 @@ do
 		   shift
 			save_args -li "$1"
 		;;
-     -r|--required)
-         DO_REQUIRED=true
-         shift
-         REQUIRED="$1"
-      ;;
 	  -b|--blob)
 		   shift
 			BLOB="$1"
@@ -351,6 +347,11 @@ do
 		  shift
 		  BLOB="$1"
       ;;
+     --required)
+         DO_REQUIRED=true
+         shift
+         REQUIRED="$1"
+      ;;
      --contents)
         DO_DUMP_CONTENTS=true
 		  shift
@@ -455,7 +456,6 @@ CACHE_CONFIG="$BINDIR/.CACHE"
 		sed -i "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
 		# sed "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
 	}
-	exit
 }
 
 
@@ -538,9 +538,7 @@ source $CACHE_CONFIG
 
 ## Packages
 # exists
-[ ! -z $DO_EXISTS ] && {
-	exists $BLOB
-}
+[ ! -z $DO_EXISTS ] && not_exists $BLOB
 
 # required
 [ ! -z $DO_REQUIRED ] && {
@@ -643,7 +641,7 @@ FINGERPRINT=$FINGERPRINT"
 	ENTRY=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g'`
 	# printf "$ENTRY\n" | awk -F ':' '{ print $4 }'
 	LINE=`printf "$ENTRY\n" | awk -F ':' '{ print $1 }'`
-	FOLDER=`printf "$ENTRY\n" | awk -F ':' '{ print $4 }'`
+	FOLDER="$CACHE_DIR/`printf "$ENTRY\n" | awk -F ':' '{ print $4 }'`"
 
 	# Remove the folder
 	[ -d "$FOLDER" ] && rm -rfv $FOLDER
@@ -835,6 +833,8 @@ FINGERPRINT=$FINGERPRINT"
 
 	# Expand the directory if not absolute.
 	LINK_TO=`get_fullpath $LINK_TO`
+	#echo $LINK_TO
+	#exit
 
 	# Error out if the folder exists.
 	[ -d "$LINK_TO" ] && {
@@ -854,12 +854,13 @@ FINGERPRINT=$FINGERPRINT"
 		# Move through each file and make sure that it doesn't match what
 		# you want excluded.
 
-		# Define a relative root.
-		RELATIVE_ROOT=`printf "%s" $LINK_FILE | sed "s#$BLOB_ROOT##"`
+		# Define a relative root, always cutting the trailing slash.
+		RELATIVE_ROOT=`printf "%s" $LINK_FILE | \
+			sed "s#${BLOB_ROOT}##" | sed 's#^/##'`
 
 		# Make any directories.
 		[ -d "$LINK_FILE" ] && {
-			mkdir $MKDIR_FLAGS $LINK_TO/$RELATIVE_ROOT
+			mkdir -pv $LINK_TO/$RELATIVE_ROOT
 			continue
 		}
 
