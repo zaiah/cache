@@ -332,6 +332,9 @@ do
      --uninstall)
          DO_UNINSTALL=true
       ;;
+     --dist-info)
+         DO_DIST_INFO=true
+      ;;
      -d|--dir|--directory)
          DO_FOLDER=true
 			shift
@@ -514,6 +517,18 @@ source $CACHE_CONFIG
 	}' $CACHE_DB 
 }
 
+# Get information on your current instance of cache.
+[ ! -z $DO_DIST_INFO ] && { 
+	source $CACHE_CONFIG
+	printf "Cache Directory:          $CACHE_DIR\n"
+	printf "Cache Database:           $CACHE_DB\n"
+	printf "Default Version:          $DEFAULT_VERSION\n"
+	printf "Deployment Type:          $COPY_TYPE\n"
+	printf "Folder Name Format:       $FORMAT\n"
+	printf "Custom Formatting:        $FORMAT_CUSTOM\n"
+	printf "Default remote URL root:  ${REMOTE_URL_ROOT:-None}\n"
+	printf "Default global key:       ${REMOTE_GLOBAL_KEY:-None}\n"
+}
 
 ## Packages
 # exists
@@ -796,6 +811,7 @@ FINGERPRINT=$FINGERPRINT"
 
 # assess needs (are all the dependencies on this system?)
 [ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
+
 
 
 # Link to
