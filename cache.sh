@@ -155,6 +155,7 @@ Parameter tuning:
 	                          should be tracked in a package. 
 
 General:
+    --set-cache-dir <arg>    Set the cache directory to <arg>
 -i, --info <pkg>             Display all information about a package.
     --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
@@ -420,24 +421,38 @@ done
 }
 
 
-
-# Generate a .CACHE file.
+# Always should have a configuration file.
 CACHE_CONFIG="$BINDIR/.CACHE"
+
+
+# Set a cache directory first.
+[ ! -z $DO_SET_CACHE_DIR ] && {
+	# Was a cache directory given?
+	[ -z "$CACHE_DIR" ] && error -e 1 -m "No cache directory specified."
+
+	# Get the fullpath.
+	CACHE_DIR=`get_fullpath $CACHE_DIR`
+	# echo $CACHE_DIR
+
+	# Make the directory.
+	[ ! -d "$CACHE_DIR" ] && mkdir $CACHE_DIR
+
+	# Update the configuration file and move the old data. 
+	[ -f "$CACHE_CONFIG" ] && {
+		OLD_CACHE_DIR=`sed -n '/^CACHE_DIR=/p' $CACHE_CONFIG | sed "s/^CACHE_DIR=//"`
+		[ -d "$OLD_CACHE_DIR" ] && {
+			mv -v $OLD_CACHE_DIR/* $CACHE_DIR
+		}
+		sed -i "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
+		# sed "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
+	}
+	exit
+}
+
+
+# Generate a configuration file.
 if [ ! -f "$CACHE_CONFIG" ]
 then
-	# Set a cache directory first.
-	[ ! -z $DO_SET_CACHE_DIR ] && {
-		# Was a cache directory given?
-		[ -z "$CACHE_DIR" ] && error -e 1 -m "No cache directory specified."
-
-		# Get the fullpath.
-		CACHE_DIR=`get_fullpath $CACHE_DIR`
-
-		# Make the directory.
-		mkdir $CACHE_DIR
-		exit
-	}
-
 	REMOTE_URL_ROOT=${REMOTE_URL_ROOT}
 	REMOTE_GLOBAL_KEY=${REMOTE_GLOBAL_KEY}
 	echo $CACHE_DIR

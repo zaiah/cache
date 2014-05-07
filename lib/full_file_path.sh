@@ -2,6 +2,22 @@
 # get_fullpath.sh 
 # 
 # Evaluates the full file path of some directory.
+#
+# -----------------------------------------------------
+# Succeed:
+# ../path
+# ../../path (and so on...)
+# path
+# path/new_path (and so on...)
+# .
+# .. and ../
+# 
+# Fail:
+# ../path/bob (and so on...)
+# ../path/../../jason
+# 
+# Seems that readlink and the solution below can't follow 
+# these paths all the way through.
 #-----------------------------------------------------#
 function get_fullpath() {
 	# Must have uname
@@ -20,8 +36,14 @@ function get_fullpath() {
 		# If name contains linux, then use readlink -f
 		if [[ "$osname" =~ "LINUX" ]]
 		then
-			# Handle a symbolic link more effectively.
-			readlink -f "$1" 
+			# If it's a directory we do something else.
+			if [[ "$1" =~ "/" ]] && [[ ! "$1" =~ '.' ]]
+			then
+				printf "%s" $(pwd)/$1
+			else
+				# Handle a symbolic link more effectively.
+				readlink -f "$1" 
+			fi
 
 		# Cygwin and Mac OSX will require another method.
 		elif [[ "$osname" =~ "CYGWIN" ]] || [[ "$osname" =~ "DARWIN" ]]
