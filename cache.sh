@@ -442,19 +442,25 @@ CACHE_CONFIG="$BINDIR/.CACHE"
 
 	# Get the fullpath.
 	CACHE_DIR=`get_fullpath $CACHE_DIR`
-	# echo $CACHE_DIR
+	[ ! -z $VERBOSE ] && printf "New cache dir is at: $CACHE_DIR\n"
 
 	# Make the directory.
-	[ ! -d "$CACHE_DIR" ] && mkdir $CACHE_DIR
+	[ ! -d "$CACHE_DIR" ] && mkdir -pv $CACHE_DIR
 
 	# Update the configuration file and move the old data. 
 	[ -f "$CACHE_CONFIG" ] && {
+		# First, keep a record of the old directory.
 		OLD_CACHE_DIR=`sed -n '/^CACHE_DIR=/p' $CACHE_CONFIG | sed "s/^CACHE_DIR=//"`
+
+		# Move the old data to the new directory.
+		# [ -d "$OLD_CACHE_DIR" ] && echo "AAAAH!!!" 
 		[ -d "$OLD_CACHE_DIR" ] && {
 			mv -v $OLD_CACHE_DIR/* $CACHE_DIR
+			mv -v $OLD_CACHE_DIR/.CACHE_DB $CACHE_DIR/.CACHE_DB
 		}
+
+		# Update the configuration file.
 		sed -i "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
-		# sed "s|^\(CACHE_DIR=\).*|\1$CACHE_DIR|" $CACHE_CONFIG
 	}
 }
 
