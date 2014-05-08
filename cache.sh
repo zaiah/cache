@@ -85,13 +85,14 @@ version() {
 }
 
 
-# Ignore certain items.
+# Choose from array, this is VERY bad programming.  Stop being lazy.
 SVAR=
 DVAR=
 GIVAR=
 LIVAR=
 EVAR=
-
+MVAR=
+TVAR=
 save_args() {
 	while [ $# -gt 0 ]
 	do
@@ -101,6 +102,8 @@ save_args() {
 			-gi) 	shift; GIVAR="$GIVAR\n$1";;
 			-li) 	shift; LIVAR="$LIVAR\n$1";;
 			-ex) 	shift; EVAR="$EVAR\n$1";;
+			-dir) shift; MVAR="$MVAR\n$1";;
+			-file) shift; TVAR="$TVAR\n$1";;
 			-dump)
 				shift
 				local TERM=
@@ -110,6 +113,8 @@ save_args() {
 					gi) TERM="$GIVAR" ;;
 					li) TERM="$LIVAR" ;;
 					ex) TERM="$EVAR" ;;
+					dir) TERM="$MVAR" ;;
+					file) TERM="$TVAR" ;;
 					*) error -e 1 \
 						-m "Incorrect item given to save_args -dump." \
 						-p "cache: DEVELOPER ERROR"
@@ -121,7 +126,7 @@ save_args() {
 				printf "$ARGDUMP"
 			;;
 		esac
-	shift
+		shift
 	done
 #	SVAR="$SVAR\n$1"	
 }
@@ -209,6 +214,16 @@ do
 		   DO_LINK_TO=true
 			shift
 			LINK_TO="$1"
+		;;
+	  --mkdir)
+		   DO_MKDIR=true
+			shift
+			save_args -dir	"$1"
+		;;
+	  --touch)
+		   DO_TOUCH=true
+			shift
+			save_args -file "$1"
 		;;
 	  --symlink-to)
 		   DO_SYMLINK_TO=true
@@ -733,6 +748,61 @@ FINGERPRINT=$FINGERPRINT"
 	done < $JELLY
 }
 
+
+# Make multiple directories
+[ ! -z $DO_MKDIR ] && {
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+
+	# Move through the array and make each thing.
+	save_args -dump dir | { 
+		FN="`cat /dev/stdin`"
+		while read line
+		do
+			[ ! -z "$line" ] && {
+				for the_dir in $(printf "$line\n" | sed "s/,/ /g")
+				do
+					echo mkdir -pv $FOLDER/$the_dir
+					mkdir -pv $FOLDER/$the_dir
+				done
+			}
+		done < $FN
+	}
+}
+
+
+# Make multiple files.
+[ ! -z $DO_TOUCH ] && {
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+
+	# Move through the array and make each thing.
+	save_args -dump file | { 
+		FN="`cat /dev/stdin`"
+		while read line
+		do
+			[ ! -z "$line" ] && {
+				for the_file in $(printf "$line\n" | sed "s/,/ /g")
+				do
+					echo touch $FOLDER/$the_file
+					touch $FOLDER/$the_file
+				done
+			}
+		done < $FN
+	}
+}
 
 # Commit
 # 1. add a branch corresponding to the version, just stash changes so that they don't get lost.

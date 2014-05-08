@@ -3,6 +3,7 @@ cache=/home/zaiah/projects/cache {
  DEPENDENCIES
  EXAMPLE_MANIFEST
  README.md
+ checklist
  cache.sh
  cache.vim
  gen.sh
