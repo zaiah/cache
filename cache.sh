@@ -662,9 +662,12 @@ FINGERPRINT=$FINGERPRINT"
 	# echo MANIFEST >> $LINKIGNORE
 	# echo DEPENDENCIES >> $LINKIGNORE
 	# echo VERSION >> $LINKIGNORE
-	# 
+	#
+
+	# Do not track VERSION by default.
+	echo VERSIONS >> $GITIGNORE
 	
-	# A file called SUMMARY can keep all of this important information in one place.
+	# A file called SUMMARY can keep all important information in one place.
 
 	# Does file exist in database?
 	# If not, add a record to your file based database.
@@ -679,7 +682,8 @@ FINGERPRINT=$FINGERPRINT"
 	{ 
 		printf "1|"			# Number
 		printf "`rand`|"	# ID
-		printf "INITIAL"	# Name (proper version name, like 2.12)
+		printf "*INITIAL"	# Name (proper version name, like 2.12)
+		printf "\n"
 	} > $VERSIONS
 
 
@@ -887,21 +891,27 @@ FINGERPRINT=$FINGERPRINT"
 	# Define the manifest
 	VERSIONS="$FOLDER/VERSIONS"
 
-	# #2
-	# Automatically stash the changes and commit a new version.
-	# git stash
+	# Replace the current versions.
+	sed -i 's/*CURRENT//' $VERSIONS
+
+	# Print the new copy off.
 	CURRENT_VERSION=`rand`
 	{ 
 		printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
-		printf "$CURRENT_VERSION\n|"
-		printf "$VERSION_NAME\n"
-	} >> my-vers-info # $VERSIONS
+		printf "$CURRENT_VERSION|"
+		printf "${VERSION_NAME-'*CURRENT'}" | sed "s/'//g"
+		printf "\n"
+	} >> $VERSIONS
 
 	# echo "Changing to directory: $FOLDER..."
 	cd $FOLDER
 	git add .
 	git branch $CURRENT_VERSION
 	#CURRENT_VERSION git stash?
+	echo "VERSION file contains:"
+	[ ! -f $VERSIONS ] && { echo "NOOOOOO!"; exit 1; }
+	cat $VERSIONS
+	echo
 	git checkout $CURRENT_VERSION
 	git commit -m "cache $CURRENT_VERSION - `date`"
 	git checkout master
