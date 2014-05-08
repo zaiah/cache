@@ -147,7 +147,8 @@ Database stuff:
     --master <arg>           Update the master branch. 
 -n, --needs <arg>            Set a dependence. 
 -x, --no-longer-needs <arg>  Unset a dependency. 
-    --list-needs <arg>       Set a dependence. 
+    --list-needs <arg>       List <arg>'s dependencies.
+    --ignore-needs           Disregard dependencies. 
 -k, --link-to <arg>          Put a package somewhere.
     --symlink-to <arg>       Put a package somewhere.
     --link-ignore <arg>      Ignore these when linking out.
@@ -170,6 +171,7 @@ General:
     --cd <arg>               Use <arg> as the current cache directory.
 	                          (Will fail if .CACHE_DB is not there.)
 -i, --info <pkg>             Display all information about a package.
+	 --list-versions <arg>    List all the versions out.
     --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
 -d, --directory              Where is an application's home directory? 
@@ -680,9 +682,11 @@ FINGERPRINT=$FINGERPRINT"
 	# Add some version information (we always assume this is the first one).
 	CURRENT_VERSION=`rand`
 	{ 
-		printf "1|"			# Number
-		printf "`rand`|"	# ID
-		printf "*INITIAL"	# Name (proper version name, like 2.12)
+		printf "1|"						# Number
+		printf "$CURRENT_VERSION|"	# ID
+		printf "`date`|"				# Date 
+		printf "$VERSION_NAME|"		# Name (proper version name, like 2.12)
+		printf "*INITIAL"				# Commit/version type
 		printf "\n"
 	} > $VERSIONS
 
@@ -700,7 +704,7 @@ FINGERPRINT=$FINGERPRINT"
 	git branch "$CURRENT_VERSION"		
 	if [ -z `git branch | grep -v 'master'` ] 
 	then
-		error -m "cache was not able to track this repository." 
+		error -m "Not able to track '$BLOB' repository." -p "cache"
 	else
 		echo "Repository creation successful."
 	fi
@@ -892,14 +896,16 @@ FINGERPRINT=$FINGERPRINT"
 	VERSIONS="$FOLDER/VERSIONS"
 
 	# Replace the current versions.
-	sed -i 's/*CURRENT//' $VERSIONS
+	sed -i 's/*CURRENT/*CHECKPOINT/' $VERSIONS
 
 	# Print the new copy off.
 	CURRENT_VERSION=`rand`
 	{ 
 		printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
 		printf "$CURRENT_VERSION|"
-		printf "${VERSION_NAME-'*CURRENT'}" | sed "s/'//g"
+		printf "`date`|"
+		printf "$VERSION_NAME|"
+		printf "*CURRENT" 
 		printf "\n"
 	} >> $VERSIONS
 
@@ -907,11 +913,6 @@ FINGERPRINT=$FINGERPRINT"
 	cd $FOLDER
 	git add .
 	git branch $CURRENT_VERSION
-	#CURRENT_VERSION git stash?
-	echo "VERSION file contains:"
-	[ ! -f $VERSIONS ] && { echo "NOOOOOO!"; exit 1; }
-	cat $VERSIONS
-	echo
 	git checkout $CURRENT_VERSION
 	git commit -m "cache $CURRENT_VERSION - `date`"
 	git checkout master
@@ -1014,6 +1015,14 @@ FINGERPRINT=$FINGERPRINT"
 		# Find entry and delete it.
 		sed -i "/^${line}$/d" $DEPENDENCIES
 	done < $DEPS
+
+	# Check that each dependency exists. 
+#	save_args -dump deps | { FN=`cat /dev/stdin`; while read line
+#	do
+#		# Find entry and delete it.
+#		sed -i "/^${line}$/d" $DEPENDENCIES
+#	done < $FN; }
+
 }
 
 
@@ -1041,13 +1050,13 @@ FINGERPRINT=$FINGERPRINT"
 	then 
 		printf "$COUNT dependency found for '$BLOB':\n"
 	fi
-	cat $DEPENDENCIES
+
+	cat $DEPENDENCIES | awk -F '|' '{ print $1 }'
 }
 
 
 # assess needs (are all the dependencies on this system?)
 [ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
-
 
 
 # Link to
@@ -1063,7 +1072,7 @@ FINGERPRINT=$FINGERPRINT"
 	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
 		awk -F ':' '{ print $4 }'`
 	
-	# Expand the directory if not absolute.
+	# Expand the destination directory if not absolute.
 	LINK_TO=`get_fullpath $LINK_TO`
 
 	# Error out if the folder exists.

@@ -1,12 +1,11 @@
 x mkdir
 x touch
-no-touch
-no-mkdir
-link-ignore
-git-ignore
+x no-touch
+x no-mkdir
+x link-ignore
+x git-ignore
 ignore-needs
 version
-version-name
 dependencies use IDs and reference the CACHE_DB for new ones
 autodependency (bring in both)
 uninit (remove from git history)
@@ -19,6 +18,9 @@ test suite for everything (this MUST work pretty much all the time)
 Usage: ./cache
 	[ -  ]
 Database stuff:
+
+
+
 x	-e, --exists <arg>           Does this file exist? 
 x	-c, --create <arg>           Add a package. 
 x	-r, --remove <arg>           Remove a package. 
@@ -31,6 +33,7 @@ x	-m, --commit <arg>           Commit changes to a package.
 x	-n, --needs <arg>            Set a dependence. 
 x	-x, --no-longer-needs <arg>  Unset a dependency. 
 x		--list-needs <arg>        Set a dependence. 
+    	--ignore-needs           Disregard dependencies. 
 		--list-versions <arg>     List all the versions out.
 x	-k, --link-to <arg>          Put a package somewhere.
 x		--symlink-to <arg>        Put a package somewhere.
