@@ -128,12 +128,6 @@ save_args() {
 		esac
 		shift
 	done
-#	SVAR="$SVAR\n$1"	
-}
-
-DVAR=
-save_deps() {
-	DVAR="$DVAR\n$1"	
 }
 
 
@@ -159,22 +153,15 @@ Database stuff:
     --link-ignore <arg>      Ignore these when linking out.
     --git-ignore <arg>       Ignore these when committing.
     --uninit <arg>           Remove all tracking information from git.
+-b, --blob <arg>             Select by name. 
+-u, --uuid <arg>             Select by unique identifier. 
 
 Parameter tuning:
     --version <arg>          Select or choose version. 
--u, --uuid <arg>             Select by UUID. 
 -s, --summary <arg>          Select or choose summary. 
-    --description <arg>      Select or choose description. 
-    --title <arg>            Select or choose title. 
-    --namespace <arg>        Select or choose name. 
--f, --filename <arg>         Select by filename. 
--u, --url <arg>              Select or choose by URL 
     --produced-on <arg>      Select a date.
 -a, --authors <arg>          Select or choose a set of authors. 
-    --signature <arg>        Select or choose a signature. 
-    --key <arg>              Select or choose a key. 
-    --fingerprint <arg>      Select or choose a fingerprint.
-    --extra <arg>            Supply key value pairs of whatever else 
+-q, --extra <arg>            Supply key value pairs of whatever else 
 	                          should be tracked in a package. 
 
 General:
@@ -211,14 +198,21 @@ do
          shift
          BLOB="$1"
       ;;
-	  -k|--link-to)
-		   DO_LINK_TO=true
-			shift
-			LINK_TO="$1"
-		;;
-	  --work)
-		   DO_WORK=true
-		;;
+     -c|--create)
+         DO_CREATE=true
+         shift
+         BLOB="$1"
+      ;;
+     -r|--remove)
+         DO_REMOVE=true
+         shift
+         BLOB="$1"
+      ;;
+     -u|--update)
+         DO_UPDATE=true
+         shift
+         BLOB="$1"
+      ;;
 	  --mkdir)
 		   DO_MKDIR=true
 			shift
@@ -228,6 +222,17 @@ do
 		   DO_TOUCH=true
 			shift
 			save_args -file "$1"
+		;;
+	  --no-mkdir)
+		   NO_MKDIR=true
+		;;
+	  --no-touch)
+		   NO_TOUCH=true
+		;;
+	  -k|--link-to)
+		   DO_LINK_TO=true
+			shift
+			LINK_TO="$1"
 		;;
 	  --symlink-to)
 		   DO_SYMLINK_TO=true
@@ -255,21 +260,6 @@ do
       ;;
      --master)
          DO_COMMIT_MASTER=true
-         shift
-         BLOB="$1"
-      ;;
-     -c|--create)
-         DO_CREATE=true
-         shift
-         BLOB="$1"
-      ;;
-     -r|--remove)
-         DO_REMOVE=true
-         shift
-         BLOB="$1"
-      ;;
-     -u|--update)
-         DO_UPDATE=true
          shift
          BLOB="$1"
       ;;
@@ -317,11 +307,6 @@ do
          DO_NAMESPACE=true
          shift
          save_args -args "NAMESPACE=$1"
-      ;;
-     -f|--archive)
-         DO_ARCHIVE=true
-         shift
-         save_args -args "ARCHIVE=$1"
       ;;
      -u|--url)
          DO_URL=true
@@ -625,11 +610,10 @@ source $CACHE_CONFIG
 	DEPENDENCIES="$FOLDER/DEPENDENCIES"
 	MANIFEST="$FOLDER/MANIFEST"
 	VERSIONS="$FOLDER/VERSIONS"
-	INFO="$FOLDER/INFO"
 	INSTALL="$FOLDER/INSTALL"
-	README="$FOLDER/README"
+	README="$FOLDER/README.md"
 	GITIGNORE="$FOLDER/.gitignore"
-	RSYNCIGNORE="$FOLDER/.rsyncignore"
+	# RSYNCIGNORE="$FOLDER/.rsyncignore"
 	LINKIGNORE="$FOLDER/.linkignore"
 
 	FILE_ARR=(
@@ -637,11 +621,10 @@ source $CACHE_CONFIG
 		"$DEPENDENCIES" 
 		"$MANIFEST" 
 		"$VERSIONS" 
-		"$INFO" 
 		"$INSTALL" 
 		"$README"
 		"$GITIGNORE"
-		"$RSYNCIGNORE"
+	#	"$RSYNCIGNORE"
 		"$LINKIGNORE"
 	)
 
@@ -655,8 +638,8 @@ source $CACHE_CONFIG
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
 
 	# Make all the needed files and folders.
-	for F in ${FILE_ARR[@]}; do [ ! -f "$F" ] && touch $F; done
-	for D in ${DIR_ARR[@]}; do [ ! -d "$D" ] && mkdir -pv $D; done
+	[ -z $NO_MKDIR ] && for D in ${DIR_ARR[@]}; do [ ! -d "$D" ] && mkdir -pv $D; done
+	[ -z $NO_TOUCH ] && for F in ${FILE_ARR[@]}; do [ ! -f "$F" ] && touch $F; done
 
 	# Put this manifest somewhere.
 	{
@@ -675,6 +658,14 @@ KEY=$KEY
 FINGERPRINT=$FINGERPRINT"
 	} > $MANIFEST
 
+	# Do not link certain files by default.
+	# echo MANIFEST >> $LINKIGNORE
+	# echo DEPENDENCIES >> $LINKIGNORE
+	# echo VERSION >> $LINKIGNORE
+	# 
+	
+	# A file called SUMMARY can keep all of this important information in one place.
+
 	# Does file exist in database?
 	# If not, add a record to your file based database.
 	{ 
@@ -686,19 +677,29 @@ FINGERPRINT=$FINGERPRINT"
 	# Add some version information (we always assume this is the first one).
 	CURRENT_VERSION=`rand`
 	{ 
-		printf "001|"
-		printf "`rand`"
+		printf "1|"			# Number
+		printf "`rand`|"	# ID
+		printf "INITIAL"	# Name (proper version name, like 2.12)
 	} > $VERSIONS
 
 
 	# Finally, start with the version control madness.
 	cd $FOLDER
+	#echo "Initializing Git repository for $BLOB..."
 	git init
+	#echo "Adding all files..."
 	git add .
-	GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
+	# GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
+	#echo "Running initial commit..."
 	git commit -m "cache_$CURRENT_VERSION committed on `date`"
+	#echo "Creating new branch for $CURRENT_VERSION..."
 	git branch "$CURRENT_VERSION"		
-	[ -z `git branch | grep -v 'master'` ] && error -m "cache was not able to track this repository."
+	if [ -z `git branch | grep -v 'master'` ] 
+	then
+		error -m "cache was not able to track this repository." 
+	else
+		echo "Repository creation successful."
+	fi
 	cd $CURRENT_PATH
 }
 
@@ -881,7 +882,6 @@ FINGERPRINT=$FINGERPRINT"
 	not_exists $BLOB
 
 	# Find entry.
-	CURRENT_PATH="`pwd`"
 	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
 
 	# Define the manifest
@@ -895,8 +895,9 @@ FINGERPRINT=$FINGERPRINT"
 		printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
 		printf "$CURRENT_VERSION\n|"
 		printf "$VERSION_NAME\n"
-	} >> $VERSIONS
+	} >> my-vers-info # $VERSIONS
 
+	# echo "Changing to directory: $FOLDER..."
 	cd $FOLDER
 	git add .
 	git branch $CURRENT_VERSION

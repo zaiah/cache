@@ -21,37 +21,31 @@ Usage: ./cache
 Database stuff:
 x	-e, --exists <arg>           Does this file exist? 
 x	-c, --create <arg>           Add a package. 
+x	-r, --remove <arg>           Remove a package. 
+	-u, --update <arg>           Update a package. 
 x		--mkdir <arg>             Make additional directories. 
 x		--touch <arg>             Create additional files.
 x		--no-mkdir <arg>          Skip directory creation.
 x		--no-touch <arg>          Skip file creation.
-x	-r, --remove <arg>           Remove a package. 
-	-u, --update <arg>           Update a package. 
 x	-m, --commit <arg>           Commit changes to a package.
 x	-n, --needs <arg>            Set a dependence. 
 x	-x, --no-longer-needs <arg>  Unset a dependency. 
 x		--list-needs <arg>        Set a dependence. 
+		--list-versions <arg>     List all the versions out.
 x	-k, --link-to <arg>          Put a package somewhere.
 x		--symlink-to <arg>        Put a package somewhere.
 x		--link-ignore <arg>       Ignore these when linking out.
 x		--git-ignore <arg>        Ignore these when committing.
 		--uninit <arg>            Remove all tracking information from git.
+	-u, --uuid <arg>             Select by UUID. 
+x	-b, --blob
 
 	Parameter tuning:
 		--version <arg>          Select or choose version. 
-	-u, --uuid <arg>             Select by UUID. 
-	-s, --summary <arg>          Select or choose summary. 
-		--description <arg>      Select or choose description. 
-		--title <arg>            Select or choose title. 
-		--namespace <arg>        Select or choose name. 
-	-f, --filename <arg>         Select by filename. 
-	-u, --url <arg>              Select or choose by URL 
+x	-s, --summary <arg>          Select or choose summary. 
 		--produced-on <arg>      Select a date.
 	-a, --authors <arg>          Select or choose a set of authors. 
-		--signature <arg>        Select or choose a signature. 
-		--key <arg>              Select or choose a key. 
-		--fingerprint <arg>      Select or choose a fingerprint.
-		--extra <arg>            Supply key value pairs of whatever else 
+	-q, --extra <arg>            Supply key value pairs of whatever else 
 										should be tracked in a package. 
 
 	General:
