@@ -6,8 +6,11 @@ x link-ignore
 x git-ignore
 ignore-needs
 version
-dependencies use IDs and reference the CACHE_DB for new ones
-autodependency (bring in both)
+	dependencies use IDs and reference the CACHE_DB for new ones
+link-to
+x	single
+	multiple (account for autodependency (bring in both))
+freeze
 uninit (remove from git history)
 setup (put in setup mode and do the following)
 	required

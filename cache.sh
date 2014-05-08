@@ -93,6 +93,7 @@ LIVAR=
 EVAR=
 MVAR=
 TVAR=
+CVAR=
 save_args() {
 	while [ $# -gt 0 ]
 	do
@@ -104,6 +105,7 @@ save_args() {
 			-ex) 	shift; EVAR="$EVAR\n$1";;
 			-dir) shift; MVAR="$MVAR\n$1";;
 			-file) shift; TVAR="$TVAR\n$1";;
+			-depchain) shift; CVAR="$CVAR\n$1";;
 			-dump)
 				shift
 				local TERM=
@@ -114,6 +116,7 @@ save_args() {
 					li) TERM="$LIVAR" ;;
 					ex) TERM="$EVAR" ;;
 					dir) TERM="$MVAR" ;;
+					depchain) TERM="$CVAR" ;;
 					file) TERM="$TVAR" ;;
 					*) error -e 1 \
 						-m "Incorrect item given to save_args -dump." \
@@ -128,6 +131,41 @@ save_args() {
 		esac
 		shift
 	done
+}
+
+
+
+# eat_dependencies
+LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
+CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
+
+eat_dependencies() {
+	# if -f DEPENDENCIES
+	while read line
+	do
+		# Was it already tracked as non-existent?
+		# sed "s/^$line\n/" 
+
+		# Check that the thing exists.
+		not_exists "$line"
+
+		# Find the directory for this file. 
+		DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
+			sed 's/|/:/g' | \
+			awk -F ':' '{ print $4 }')"
+
+		# Does it exist?
+		[ ! -d "$DEP_FOLDER" ] && {
+			printf "$line\n" >> $LACK_DEPS
+			continue
+		}
+		
+		# Find a dependencies file within that directory.
+		[ -f "$DEP_FOLDER/$DEPENDENCIES" ] && {
+			printf "$line\n" >> $CHECK_DEPS
+		}
+	done
+	# fi
 }
 
 
@@ -288,7 +326,7 @@ do
      --version)
          DO_VERSION=true
          shift
-         save_args -args "VERSION=$1"
+         VERSION_NAME="$1"
       ;;
      -u|--uuid)
          DO_UUID=true
@@ -640,8 +678,13 @@ source $CACHE_CONFIG
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
 
 	# Make all the needed files and folders.
-	[ -z $NO_MKDIR ] && for D in ${DIR_ARR[@]}; do [ ! -d "$D" ] && mkdir -pv $D; done
-	[ -z $NO_TOUCH ] && for F in ${FILE_ARR[@]}; do [ ! -f "$F" ] && touch $F; done
+	[ -z $NO_MKDIR ] && {
+		for D in ${DIR_ARR[@]}; do [ ! -d "$D" ] && mkdir -pv $D; done
+	}
+
+	[ -z $NO_TOUCH ] && {
+		for F in ${FILE_ARR[@]}; do [ ! -f "$F" ] && touch $F; done
+	}
 
 	# Put this manifest somewhere.
 	{
@@ -1064,9 +1107,50 @@ FINGERPRINT=$FINGERPRINT"
   	# Make sure an application and destination directory has been specified.
 	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
 	[ -z "$LINK_TO" ] && error -e 1 -m "No location specified for linking." -p "cache"
-
-	# Make sure the application exists.
+	
+	# Make sure the main application exists.  Initial folder search will fail if not.
 	not_exists "$BLOB"
+
+	# Also get the initial folder. 
+	SEED_FOLDER="$CACHE_DIR/`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
+		awk -F ':' '{ print $4 }'`"
+
+	# Save it or die.
+	if [ -z "$SEED_FOLDER" ]
+	then
+		error -e 1 -m "Cannot find source folder: $SEED_FOLDER for application '$BLOB'"
+	else	
+		save_args -depchain "$BLOB|$SEED_FOLDER"
+	fi
+
+	# If there's a dependency list, loop through each entry 
+	# and pull those folders.
+	[ -z "$DO_IGNORE_NEEDS" ] && {
+		# Define the name of our file.
+		DEPENDENCIES="$SEED_FOLDER/DEPENDENCIES"
+
+		# Search through all the entries here.
+		[ -f "$DEPENDENCIES" ] && [ ! -z "`cat $DEPENDENCIES`" ] &&  {
+			# Get the folder name.
+			echo "HARAM!!!"
+		
+			# Save both to the dependency chain.
+		}
+	}
+	exit
+	# Compile a list of the application id and it's dependencies.
+	# For each dependency, save it to arg. 
+		
+	
+		# Get the application's folder if available, dying if not.
+		# (Unless ignoring dependencies.)
+
+		# Change directory and switch to *CURRENT branch unless not default. 
+
+		# Link while we are on this branch.
+
+		# Switch back to 'master'
+
 
 	# Find entry.
 	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
