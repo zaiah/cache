@@ -150,9 +150,10 @@ Database stuff:
 -r, --remove <arg>           Remove a package. 
 -u, --update <arg>           Update a package. 
 -m, --commit <arg>           Commit changes to a package.
+    --master <arg>           Update the master branch. 
 -n, --needs <arg>            Set a dependence. 
 -x, --no-longer-needs <arg>  Unset a dependency. 
-    --list-needs <arg>            Set a dependence. 
+    --list-needs <arg>       Set a dependence. 
 -k, --link-to <arg>          Put a package somewhere.
     --symlink-to <arg>       Put a package somewhere.
     --link-ignore <arg>      Ignore these when linking out.
@@ -215,6 +216,9 @@ do
 			shift
 			LINK_TO="$1"
 		;;
+	  --work)
+		   DO_WORK=true
+		;;
 	  --mkdir)
 		   DO_MKDIR=true
 			shift
@@ -246,6 +250,11 @@ do
 		;;
      -m|--commit)
          DO_COMMIT=true
+         shift
+         BLOB="$1"
+      ;;
+     --master)
+         DO_COMMIT_MASTER=true
          shift
          BLOB="$1"
       ;;
@@ -804,6 +813,63 @@ FINGERPRINT=$FINGERPRINT"
 	}
 }
 
+
+# Run a git ignore.
+[ ! -z $DO_GIT_IGNORE ] && {
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+
+	# Move through the array and make each thing.
+	save_args -dump gi | { 
+		FN="`cat /dev/stdin`"
+		GITIG="$FOLDER/.gitignore"
+		while read line
+		do
+			[ ! -z "$line" ] && {
+				for tf in $(printf "$line\n" | sed "s/,/ /g")
+				do
+					test -z "`sed -n "/^$tf/p" $GITIG`" && printf "$tf\n" >> $GITIG
+				done
+			}
+		done < $FN
+	}
+}
+
+
+# Run a link ignore.
+[ ! -z $DO_LINK_IGNORE ] && {
+	# Anything given?
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+
+	# Is it there?
+	not_exists $BLOB
+
+	# Find entry.
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+
+	# Move through the array and make each thing.
+	save_args -dump li | { 
+		FN="`cat /dev/stdin`"
+		LINKIG="$FOLDER/.linkignore"
+		while read line
+		do
+			[ ! -z "$line" ] && {
+				for tf in $(printf "$line\n" | sed "s/,/ /g")
+				do
+					test -z "`sed -n "/^$tf/p" $LINKIG`" && printf "$tf\n" >> $LINKIG
+				done
+			}
+		done < $FN
+	}
+}
+
+
 # Commit
 # 1. add a branch corresponding to the version, just stash changes so that they don't get lost.
 # 2. Or commit to that new branch.
@@ -985,11 +1051,9 @@ FINGERPRINT=$FINGERPRINT"
 	# Find entry.
 	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
 		awk -F ':' '{ print $4 }'`
-
+	
 	# Expand the directory if not absolute.
 	LINK_TO=`get_fullpath $LINK_TO`
-	#echo $LINK_TO
-	#exit
 
 	# Error out if the folder exists.
 	[ -d "$LINK_TO" ] && {
@@ -998,6 +1062,11 @@ FINGERPRINT=$FINGERPRINT"
 
 	# Run the linking.
 	BLOB_ROOT="$CACHE_DIR/$FOLDER"
+	NO_LINK="$BLOB_ROOT/.linkignore"
+	echo $BLOB_ROOT
+	echo $LINK_TO
+	echo $NO_LINK
+	# exit
 
 	# Set linking flags.
 	[ ! -z $VERBOSE ] && LN_FLAGS="-v" || LN_FLAGS=
@@ -1019,10 +1088,12 @@ FINGERPRINT=$FINGERPRINT"
 			continue
 		}
 
-		# Hard link any files.
+		# Hard or soft link any files.
 		[ -f "$LINK_FILE" ] && {
-			ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
-			continue
+			[ -z "$(sed -n "/^$(basename $LINK_FILE)/p" $NO_LINK)" ] && { 
+				ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
+				continue
+			}
 		}
 	done
 }
