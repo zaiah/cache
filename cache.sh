@@ -138,32 +138,55 @@ save_args() {
 # eat_dependencies
 LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
 CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
+ARR_ELEMENTS=
+ARR_DEPTH=20
 
 eat_dependencies() {
 	# if -f DEPENDENCIES
 	while read line
 	do
-		# Was it already tracked as non-existent?
-		# sed "s/^$line\n/" 
+		# Make sure that we're not over the array limit.
+		if [ ${#ARR_ELEMENTS[@]} -gt $ARR_DEPTH ]
+		then
+			# Only move forward if blank.
+			if [ ! -z "$line" ]
+			then
+				# Was it already tracked as non-existent?
+				# sed "s/^$line\n/" $CHECK_DEPS 
 
-		# Check that the thing exists.
-		not_exists "$line"
+				# Check that the application exists.
+				not_exists "$line"
 
-		# Find the directory for this file. 
-		DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
-			sed 's/|/:/g' | \
-			awk -F ':' '{ print $4 }')"
+				# Find the directory for this file. 
+				DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
+					sed 's/|/:/g' | \
+					awk -F ':' '{ print $4 }')"
 
-		# Does it exist?
-		[ ! -d "$DEP_FOLDER" ] && {
-			printf "$line\n" >> $LACK_DEPS
-			continue
-		}
-		
-		# Find a dependencies file within that directory.
-		[ -f "$DEP_FOLDER/$DEPENDENCIES" ] && {
-			printf "$line\n" >> $CHECK_DEPS
-		}
+				# Does it exist?
+				if [ ! -d "$DEP_FOLDER" ]
+				then
+					# Make a record of the directory.
+					printf "$line\n" >> $CHECK_DEPS
+
+					# Have we reached the end of the file?  Say so.
+					# ARR_DEPTH
+
+					# Find a dependencies file within that directory.
+					[ -f "$DEP_FOLDER/DEPENDENCIES" ] && [ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
+						eat_dependencies $DEP_FOLDER/DEPENDENCIES
+					}
+				else
+					# Make a record that we're missing this directory.
+					printf "$line\n" >> $LACK_DEPS
+
+					# Have we reached the end of the file?  Say so.
+					# ARR_DEPTH
+				fi
+			fi	
+		else
+			error -e 1 -m "The dependency chain is too deep for the limit imposed."
+			exit 1
+		fi	
 	done
 	# fi
 }
