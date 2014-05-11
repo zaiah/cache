@@ -1,4 +1,4 @@
-#!/bin/bash -
+#!/bin/bash -xv
 #-----------------------------------------------------#
 # cache
 #
@@ -85,6 +85,27 @@ version() {
 }
 
 
+get_position() {
+	[ -f "$1" ] && {
+		# Get positions.
+		END_OF_FILE=`sed -n '$=' $CHECK_DEPS 2>/dev/null`
+		CURRENT_FILE_POS=`sed -n "/^$line/ =" $CHECK_DEPS 2>/dev/null`
+
+		# Have we reached the end of the file?  Say so.
+		[ $END_OF_FILE -eq $CURRENT_FILE_POS ] && {
+			# Remove the file from the array. (or lower the level)
+			for n in ${ARR_ELEMENTS[@]}; do
+				if $n == $DEPENDENCIES; then
+					printf '' > /dev/null
+				fi
+			done
+
+			# Do some other cool stuff.  
+		}
+	}
+}
+
+
 # Choose from array, this is VERY bad programming.  Stop being lazy.
 SVAR=
 DVAR=
@@ -136,58 +157,81 @@ save_args() {
 
 
 # eat_dependencies
-LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
-CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
 ARR_ELEMENTS=
 ARR_DEPTH=20
 
 eat_dependencies() {
 	# if -f DEPENDENCIES
-	while read line
-	do
-		# Make sure that we're not over the array limit.
-		if [ ${#ARR_ELEMENTS[@]} -gt $ARR_DEPTH ]
-		then
-			# Only move forward if blank.
-			if [ ! -z "$line" ]
+	LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
+	CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
+	GRAB_DEPS="$CACHE_DIR/tmp/grab"		# Generate?
+
+	# ...
+	[ -f "$1" ] && {
+		while read line
+		do
+			# Make sure that we're not over the array limit.
+			if [ ${#ARR_ELEMENTS[@]} -lt $ARR_DEPTH ]
 			then
-				# Was it already tracked as non-existent?
-				# sed "s/^$line\n/" $CHECK_DEPS 
-
-				# Check that the application exists.
-				not_exists "$line"
-
-				# Find the directory for this file. 
-				DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
-					sed 's/|/:/g' | \
-					awk -F ':' '{ print $4 }')"
-
-				# Does it exist?
-				if [ ! -d "$DEP_FOLDER" ]
+				# Only move forward if blank.
+				if [ ! -z "$line" ]
 				then
-					# Make a record of the directory.
-					printf "$line\n" >> $CHECK_DEPS
+					echo $line; sleep 1
 
-					# Have we reached the end of the file?  Say so.
-					# ARR_DEPTH
+					# Was it already tracked as non-existent?
+					echo "Checking for possibility of file already being processed."
+					if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^$line\n/p" $CHECK_DEPS`" ] 
+					then 
+						continue
+					else
+						echo "Looks like file $line was not done yet."
+					fi
+					sleep 2
 
-					# Find a dependencies file within that directory.
-					[ -f "$DEP_FOLDER/DEPENDENCIES" ] && [ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
-						eat_dependencies $DEP_FOLDER/DEPENDENCIES
-					}
-				else
-					# Make a record that we're missing this directory.
-					printf "$line\n" >> $LACK_DEPS
+					# Check that the application exists.
+					echo "Checking for existence of application: $line"
+					not_exists "$line"
+					sleep 2
 
-					# Have we reached the end of the file?  Say so.
-					# ARR_DEPTH
-				fi
+					# Find the directory for this file. 
+					echo "Checking for home directory of application: $line"
+					DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
+						sed 's/|/:/g' | \
+						awk -F ':' '{ print $4 }')"
+					sleep 1
+
+					# Does it exist?
+					if [ ! -d "$DEP_FOLDER" ]
+					then
+						# Make a record of the directory.
+						printf "$line\n" >> $CHECK_DEPS
+
+						# Have we reached the end of the file?
+						get_position $1
+
+						# Find a dependencies file within that directory.
+						[ -f "$DEP_FOLDER/DEPENDENCIES" ] && 
+						 [ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
+							eat_dependencies $DEP_FOLDER/DEPENDENCIES
+						}
+					else
+						# Make a record that we're missing this directory.
+						printf "$line\n" >> $LACK_DEPS
+
+						# Have we reached the end of the file?  Say so.
+						get_position $1
+					fi
+				fi	
+			else
+				# error...
+				error \
+					-e 1 \
+					-m "The dependency chain is too deep for the limit imposed." \
+					-p "cache"
+				exit 1
 			fi	
-		else
-			error -e 1 -m "The dependency chain is too deep for the limit imposed."
-			exit 1
-		fi	
-	done
+		done < $1 
+	}
 	# fi
 }
 
@@ -540,7 +584,7 @@ CACHE_CONFIG="$BINDIR/.CACHE"
 	[ ! -z $VERBOSE ] && printf "New cache dir is at: $CACHE_DIR\n"
 
 	# Make the directory.
-	[ ! -d "$CACHE_DIR" ] && mkdir -pv $CACHE_DIR
+	[ ! -d "$CACHE_DIR" ] && mkdir -pv $CACHE_DIR/tmp
 
 	# Update the configuration file and move the old data. 
 	[ -f "$CACHE_CONFIG" ] && {
@@ -1154,8 +1198,11 @@ FINGERPRINT=$FINGERPRINT"
 
 		# Search through all the entries here.
 		[ -f "$DEPENDENCIES" ] && [ ! -z "`cat $DEPENDENCIES`" ] &&  {
-			# Get the folder name.
-			echo "HARAM!!!"
+			# Set the first file name to iterate through.
+			ARR_ELEMENTS=( $DEPENDENCIES )
+
+			# Go through and process the list.
+			eat_dependencies $DEPENDENCIES
 		
 			# Save both to the dependency chain.
 		}
