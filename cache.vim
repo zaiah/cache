@@ -53,10 +53,12 @@ cache=/home/zaiah/projects/cache {
  }
  lib=lib {
   __.sh
+  arr.sh
   check_for_editor.sh
   error.sh
   eval_flags.sh
   full_file_path.sh
+  in_arr.sh
   init.sh
   random.sh
   tmp_file.sh

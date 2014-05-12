@@ -1,4 +1,4 @@
-#!/bin/bash -xv
+#!/bin/bash -
 #-----------------------------------------------------#
 # cache
 #
@@ -85,25 +85,6 @@ version() {
 }
 
 
-get_position() {
-	[ -f "$1" ] && {
-		# Get positions.
-		END_OF_FILE=`sed -n '$=' $CHECK_DEPS 2>/dev/null`
-		CURRENT_FILE_POS=`sed -n "/^$line/ =" $CHECK_DEPS 2>/dev/null`
-
-		# Have we reached the end of the file?  Say so.
-		[ $END_OF_FILE -eq $CURRENT_FILE_POS ] && {
-			# Remove the file from the array. (or lower the level)
-			for n in ${ARR_ELEMENTS[@]}; do
-				if $n == $DEPENDENCIES; then
-					printf '' > /dev/null
-				fi
-			done
-
-			# Do some other cool stuff.  
-		}
-	}
-}
 
 
 # Choose from array, this is VERY bad programming.  Stop being lazy.
@@ -160,6 +141,32 @@ save_args() {
 ARR_ELEMENTS=
 ARR_DEPTH=20
 
+get_position() {
+	cfile=$1
+	cline=$2
+	[ -f "$cfile" ] && {
+		echo 'Checking file positiion.'
+		# Get positions.
+		END_OF_FILE=`sed -n '$=' $cfile 2>/dev/null`
+		CURRENT_FILE_POS=`sed -n "/^$cline/ =" $cfile  2>/dev/null`
+#echo ${ARR_ELEMENTS[@]}
+		# Have we reached the end of the file?  Say so.
+		[ $END_OF_FILE -eq $CURRENT_FILE_POS ] && {
+			echo "We've reached the end of $cfile"
+			# Remove the file from the array. (or lower the level)
+			for n in ${ARR_ELEMENTS[@]}; do
+				if [ $n == $cfile ]; then
+					echo in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
+					arr -x "$n" --from ARR_ELEMENTS
+					echo Now in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
+#					sed "/^${1}$/d" $cfile
+				fi
+			done
+
+			# Do some other cool stuff.  
+		}
+	}
+}
 eat_dependencies() {
 	# if -f DEPENDENCIES
 	LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
@@ -167,61 +174,83 @@ eat_dependencies() {
 	GRAB_DEPS="$CACHE_DIR/tmp/grab"		# Generate?
 
 	# ...
-	[ -f "$1" ] && {
-		while read line
-		do
-			# Make sure that we're not over the array limit.
-			if [ ${#ARR_ELEMENTS[@]} -lt $ARR_DEPTH ]
-			then
-				# Only move forward if blank.
-				if [ ! -z "$line" ]
-				then
-					echo $line; sleep 1
+	# 
+	[ -f "$1" ] && [[ `in_arr -a ARR_ELEMENTS -t "$1"` == "false" ]] && {
+		# Add the file.
+		arr --push "$1" --to ARR_ELEMENTS
+		echo ${ARR_ELEMENTS[@]}
+		read
 
-					# Was it already tracked as non-existent?
-					echo "Checking for possibility of file already being processed."
-					if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^$line\n/p" $CHECK_DEPS`" ] 
-					then 
-						continue
-					else
-						echo "Looks like file $line was not done yet."
-					fi
-					sleep 2
-
-					# Check that the application exists.
-					echo "Checking for existence of application: $line"
-					not_exists "$line"
-					sleep 2
-
-					# Find the directory for this file. 
-					echo "Checking for home directory of application: $line"
-					DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
-						sed 's/|/:/g' | \
-						awk -F ':' '{ print $4 }')"
-					sleep 1
-
-					# Does it exist?
-					if [ ! -d "$DEP_FOLDER" ]
+		# Make sure that we're not over the array limit.
+		if [ ${#ARR_ELEMENTS[@]} -lt $ARR_DEPTH ]
+		then
+			# Then move through all the dependencies.
+			while read line
+			do
+					# Only move forward if not blank.
+					if [ ! -z "$line" ]
 					then
-						# Make a record of the directory.
-						printf "$line\n" >> $CHECK_DEPS
+						# Was it already run through?
+						echo "Checking for possibility of application '$line' already having been processed."
+					sed -n "/^${line}$/p" $CHECK_DEPS #2>/dev/stderr
 
-						# Have we reached the end of the file?
-						get_position $1
+						# We have it, skip it.
+						if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $CHECK_DEPS`" ] 
+						then
+							echo "File $line was already found on the system."
+							get_position $1 $line
+							continue
 
-						# Find a dependencies file within that directory.
-						[ -f "$DEP_FOLDER/DEPENDENCIES" ] && 
-						 [ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
-							eat_dependencies $DEP_FOLDER/DEPENDENCIES
-						}
-					else
-						# Make a record that we're missing this directory.
-						printf "$line\n" >> $LACK_DEPS
+						# We don't have it, skip it.
+						elif [ -f "$LACK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $LACK_DEPS`" ] 
+						then
+							echo "File $line was already marked as not present on the system."
+							get_position $1 $line
+							continue	
 
-						# Have we reached the end of the file?  Say so.
-						get_position $1
+						# We haven't touched it, evaluate it.
+						else
+							# Check that the application exists.
+							echo "Checking for existence of application: $line"
+							[ -z "`cut -f 2 -d '|' $CACHE_DB | sed -n "/^$line$/p"`" ] && {
+								echo "Application '$line' not found."
+								printf "$line\n" >> $LACK_DEPS
+								# Have we reached the end of the file?
+								get_position $1 $line
+								continue
+							}
+
+							# Find the directory for this file. 
+							echo "Checking for home directory of application: $line"
+							DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
+								sed 's/|/:/g' | \
+								awk -F ':' '{ print $4 }')"
+							sleep 1
+
+							# Does it exist?
+							if [ -d "$DEP_FOLDER" ]
+							then
+								# Make a record of the directory.
+								printf "$line\n" >> $CHECK_DEPS
+
+								# Have we reached the end of the file?
+								get_position $1 $line
+
+								# Find a dependencies file within that directory.
+								[ -f "$DEP_FOLDER/DEPENDENCIES" ] && 
+								[ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
+									eat_dependencies $DEP_FOLDER/DEPENDENCIES
+								}
+							else
+								# Make a record that we're missing this directory.
+								printf "$line\n" >> $LACK_DEPS
+
+								# Have we reached the end of the file?  Say so.
+								get_position $1 $line
+							fi
+						fi	
 					fi
-				fi	
+				done < $1 
 			else
 				# error...
 				error \
@@ -230,7 +259,6 @@ eat_dependencies() {
 					-p "cache"
 				exit 1
 			fi	
-		done < $1 
 	}
 	# fi
 }
@@ -1199,7 +1227,7 @@ FINGERPRINT=$FINGERPRINT"
 		# Search through all the entries here.
 		[ -f "$DEPENDENCIES" ] && [ ! -z "`cat $DEPENDENCIES`" ] &&  {
 			# Set the first file name to iterate through.
-			ARR_ELEMENTS=( $DEPENDENCIES )
+			# ARR_ELEMENTS=( $DEPENDENCIES )
 
 			# Go through and process the list.
 			eat_dependencies $DEPENDENCIES

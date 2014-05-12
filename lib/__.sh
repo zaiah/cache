@@ -24,6 +24,8 @@ LIBS=(
   "error.sh"
   "eval_flags.sh"
   "init.sh"
+  "in_arr.sh"
+  "arr.sh"
   "full_file_path.sh"
   "random.sh"
   "tmp_file.sh"
