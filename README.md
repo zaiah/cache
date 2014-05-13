@@ -45,7 +45,7 @@ Add a package.
 <code>
     --set-cache-dir [arg]    Set the cache directory to <arg>
 
--i, --info [pkg]             Display all information about a package.
+	 -i, --info [pkg]            Display all information about a package.
 c
 	 --list-versions [arg]    List all the versions out
 
