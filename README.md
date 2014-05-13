@@ -44,8 +44,11 @@ Add a package.
 ## General:
 <code>
     --set-cache-dir [arg]    Set the cache directory to <arg>
+
 -i, --info [pkg]             Display all information about a package.
-	 --list-versions [arg]    List all the versions out.
+c
+	 --list-versions [arg]    List all the versions out
+
     --contents [pkg]         Display all contents of a package.
 -l, --list                   List all packages.
 -d, --directory              Where is an application's home directory? 
