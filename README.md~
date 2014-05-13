@@ -6,11 +6,10 @@ Cache is a shell script that handles file dependencies from the command-line.
 
 # Installation
 You can clone the newest copy at the repository address.
-https://github.com/zaiah/cache.git
 
 # Usage
-A quick guide to the command line options is listed below: 
 
+A quick guide to the command line options is listed below: 
 ## Database stuff:
 	-e, --exists [arg]           Does this file exist? 
 	-c, --create [arg]           Add a package. 
@@ -64,6 +63,3 @@ A quick guide to the command line options is listed below:
 
 
 ## Demo Cases
-Using some sh code we can see more or less how this would be used.
-
-Check in the 'examples' directory for some common uses.
