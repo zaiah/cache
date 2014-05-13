@@ -42,6 +42,7 @@ Add a package.
 	                          should be tracked in a package. 
 
 ## General:
+<code>
     --set-cache-dir [arg]    Set the cache directory to <arg>
 -i, --info [pkg]             Display all information about a package.
 	 --list-versions [arg]    List all the versions out.
@@ -53,6 +54,7 @@ Add a package.
     --uninstall              Uninstall this. 
 -v, --verbose                Be verbose in output.
 -h, --help                   Show this help and quit.
+</code>
 
 ## Under construction:
     --required [arg]         Define parameters required when creating a package.
