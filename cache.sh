@@ -174,13 +174,11 @@ get_position() {
 #declare -a CHECK_DEPS
 #declare -a GRAB_DEPS 
 eat_dependencies() {
-	# if -f DEPENDENCIES
 	LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
 	CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
 	GRAB_DEPS="$CACHE_DIR/tmp/grab"		# Generate?
 
 	# ...
-	# 
 	[ -f "$1" ] && [[ `in_arr -a ARR_ELEMENTS -t "$1"` == "false" ]] && {
 		# Add the file.
 		arr --push "$1" --to ARR_ELEMENTS
@@ -196,77 +194,84 @@ eat_dependencies() {
 				if [ ! -z "$line" ]
 				then
 					# Was it already run through?
-					echo "Checking for possibility of application '$line' already having been processed."
-					# [ -f "$CHECK_DEPS" ] && sed -n "/^${line}|/p" $CHECK_DEPS 
+					# printf "Checking for possibility of application '$line' already having been processed."
 
 					# We have it, skip it.
+					# if [ `in_arr -a CHECK_DEPS -t "$line"` ]
+					# then
 					if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^${line}|/p" $CHECK_DEPS`" ] 
 					then
-						echo "File $line was already found on the system."
+						printf "File $line was already found on the system.\n"
 						get_position $1 $line
 						continue
 
 					# We don't have it, skip it.
+					# elif [ `in_arr -a LACK_DEPS -t "$line"` ]
+					# then
 					elif [ -f "$LACK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $LACK_DEPS`" ] 
 					then
 						echo "File $line was already marked as not present on the system."
+						get_position $1 $line
+						continue	
+
+					# We haven't touched it, evaluate it.
+					else
+						# Check that the application exists.
+						echo "Checking for existence of application: $line"
+						[ -z "`cut -f 2 -d '|' $CACHE_DB | sed -n "/^$line$/p"`" ] && {
+							# Make a record of its existence.
+							printf "Application '$line' not found.\n"
+							printf "$line\n" >> $LACK_DEPS
+							# arr --push "$line" --to LACK_DEPS
+
+							# Have we reached the end of the file?
 							get_position $1 $line
-							continue	
+							continue
+						}
 
-						# We haven't touched it, evaluate it.
+						# Find the directory for this file. 
+						echo "Checking for home directory of application: $line"
+						DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
+							sed 's/|/:/g' | \
+							awk -F ':' '{ print $4 }')"
+
+						# Does it exist?
+						if [ -d "$DEP_FOLDER" ]
+						then
+							# Make a record of the directory.
+							printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
+							# arr --push "$line" --to CHECK_DEPS
+							save_args -depchain "$line|$DEP_FOLDER"	
+							# printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
+
+							# Have we reached the end of the file?
+							get_position $1 $line
+
+							# Find a dependencies file within that directory.
+							if [ -f "$DEP_FOLDER/DEPENDENCIES" ] && 
+								[ ! -z "`cat $DEP_FOLDER/DEPENDENCIES` 2>/dev/null" ] 
+							then 
+								eat_dependencies $DEP_FOLDER/DEPENDENCIES
+							fi	
 						else
-							# Check that the application exists.
-							echo "Checking for existence of application: $line"
-							[ -z "`cut -f 2 -d '|' $CACHE_DB | sed -n "/^$line$/p"`" ] && {
-								echo "Application '$line' not found."
-								printf "$line\n" >> $LACK_DEPS
-								# Have we reached the end of the file?
-								get_position $1 $line
-								continue
-							}
+							# Make a record that we're missing this directory.
+							printf "$line\n" >> $LACK_DEPS
+							# arr --push "$line" --to LACK_DEPS
 
-							# Find the directory for this file. 
-							echo "Checking for home directory of application: $line"
-							DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
-								sed 's/|/:/g' | \
-								awk -F ':' '{ print $4 }')"
-
-							# Does it exist?
-							if [ -d "$DEP_FOLDER" ]
-							then
-								# Make a record of the directory.
-								printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
-								save_args -depchain "$line|$DEP_FOLDER"	
-								# printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
-
-								# Have we reached the end of the file?
-								get_position $1 $line
-
-								# Find a dependencies file within that directory.
-								[ -f "$DEP_FOLDER/DEPENDENCIES" ] && 
-								[ ! -z "`cat $DEP_FOLDER/DEPENDENCIES`" ] && {
-									eat_dependencies $DEP_FOLDER/DEPENDENCIES
-								}
-							else
-								# Make a record that we're missing this directory.
-								printf "$line\n" >> $LACK_DEPS
-
-								# Have we reached the end of the file?  Say so.
-								get_position $1 $line
-							fi
-						fi	
-					fi
-				done < $1 
-			else
-				# error...
-				error \
-					-e 1 \
-					-m "The dependency chain is too deep for the limit imposed." \
-					-p "cache"
-				exit 1
-			fi	
+							# Have we reached the end of the file?  Say so.
+							get_position $1 $line
+						fi
+					fi	
+				fi
+			done < $1 
+		else
+			# error...
+			error \
+				-m "The dependency chain is too deep for the limit imposed." \
+				-p "cache" -e 1
+			exit 1
+		fi	
 	}
-	# fi
 }
 
 
@@ -754,7 +759,6 @@ source $CACHE_CONFIG
 	INSTALL="$FOLDER/INSTALL"
 	README="$FOLDER/README.md"
 	GITIGNORE="$FOLDER/.gitignore"
-	# RSYNCIGNORE="$FOLDER/.rsyncignore"
 	LINKIGNORE="$FOLDER/.linkignore"
 
 	FILE_ARR=(
@@ -765,7 +769,6 @@ source $CACHE_CONFIG
 		"$INSTALL" 
 		"$README"
 		"$GITIGNORE"
-	#	"$RSYNCIGNORE"
 		"$LINKIGNORE"
 	)
 
@@ -1024,8 +1027,7 @@ FINGERPRINT=$FINGERPRINT"
 
 
 # Commit
-# 1. add a branch corresponding to the version, just stash changes so that they don't get lost.
-# 2. Or commit to that new branch.
+# Adds named branch corresponding to the version, stashing any unsaved changes.
 [ ! -z $DO_COMMIT ] && {
 	# Anything given?
 	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
@@ -1220,9 +1222,6 @@ FINGERPRINT=$FINGERPRINT"
 	[ -z "$SEED_FOLDER" ] && {
 		error -e 1 -m "Cannot find source folder: $SEED_FOLDER for application '$BLOB'"
 	}
-#	else	
-#		save_args -depchain "$BLOB|$SEED_FOLDER"
-#	fi
 
 	# If there's a dependency list, loop through each entry 
 	# and pull those folders.
@@ -1289,12 +1288,11 @@ FINGERPRINT=$FINGERPRINT"
 		# Change directory and switch to *CURRENT branch 
 		# unless not default. 
 		cd $BLOB_ROOT
-		# cat VERSIONS
-		# ls
 		# git stash?
 
 		# If this is the first time something has been added, it's possible
 		# that there will be no *CURRENT branch.  So we use *INITIAL instead.
+		# Version selection should be done here too.
 		if [ -z "`sed -n '/*CURRENT/p' $BLOB_ROOT/VERSIONS`" ]
 		then
 			git checkout `sed -n '$p' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
@@ -1330,56 +1328,6 @@ FINGERPRINT=$FINGERPRINT"
 		cd - 
 	done < $FN
 	}
-exit
-
-	# Find entry.
-	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
-		awk -F ':' '{ print $4 }'`
-	
-	# Expand the destination directory if not absolute.
-	LINK_TO=`get_fullpath $LINK_TO`
-
-	# Error out if the folder exists.
-	[ -d "$LINK_TO" ] && {
-		error -e 1 -m "'$LINK_TO' already exists.\nNot relinking." -p "cache"
-	}
-
-	# Run the linking.
-	BLOB_ROOT="$CACHE_DIR/$FOLDER"
-	NO_LINK="$BLOB_ROOT/.linkignore"
-	echo $BLOB_ROOT
-	echo $LINK_TO
-	echo $NO_LINK
-	# exit
-
-	# Set linking flags.
-	[ ! -z $VERBOSE ] && LN_FLAGS="-v" || LN_FLAGS=
-	[ ! -z $DO_SYMLINK_TO ] && LN_FLAGS="-s $LN_FLAGS" 
-
-	# Get a full directory listing.  -print0?
-	for LINK_FILE in `find $BLOB_ROOT | grep -v '.git'` 
-	do
-		# Move through each file and make sure that it doesn't match what
-		# you want excluded.
-
-		# Define a relative root, always cutting the trailing slash.
-		RELATIVE_ROOT=`printf "%s" $LINK_FILE | \
-			sed "s#${BLOB_ROOT}##" | sed 's#^/##'`
-
-		# Make any directories.
-		[ -d "$LINK_FILE" ] && {
-			mkdir -pv $LINK_TO/$RELATIVE_ROOT
-			continue
-		}
-
-		# Hard or soft link any files.
-		[ -f "$LINK_FILE" ] && {
-			[ -z "$(sed -n "/^$(basename $LINK_FILE)/p" $NO_LINK)" ] && { 
-				ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
-				continue
-			}
-		}
-	done
 }
 
 # Wipe any open temporary files.
