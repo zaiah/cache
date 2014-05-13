@@ -10,12 +10,12 @@ Cache is a shell script that handles file dependencies from the command-line.
 # Usage
 
 A quick guide to the command line options is listed below: 
-Database stuff:
--e, --exists <arg>           Does this file exist? 
--c, --create <arg>           Add a package. 
-    --mkdir <arg>            Make additional directories. 
-    --touch <arg>            Create additional files.
--r, --remove <arg>           Remove a package. 
+## Database stuff:
+-	-e, --exists <arg>           Does this file exist? 
+-	-c, --create <arg>           Add a package. 
+-	    --mkdir <arg>            Make additional directories. 
+-	    --touch <arg>            Create additional files.
+-	-r, --remove <arg>           Remove a package. 
 -u, --update <arg>           Update a package. 
 -m, --commit <arg>           Commit changes to a package.
     --master <arg>           Update the master branch. 
@@ -31,7 +31,7 @@ Database stuff:
 -b, --blob <arg>             Select by name. 
 -u, --uuid <arg>             Select by unique identifier. 
 
-Parameter tuning:
+## Parameter tuning:
     --version <arg>          Select or choose version. 
 -s, --summary <arg>          Select or choose summary. 
     --produced-on <arg>      Select a date.
@@ -39,7 +39,7 @@ Parameter tuning:
 -q, --extra <arg>            Supply key value pairs of whatever else 
 	                          should be tracked in a package. 
 
-General:
+## General:
     --set-cache-dir <arg>    Set the cache directory to <arg>
 -i, --info <pkg>             Display all information about a package.
 	 --list-versions <arg>    List all the versions out.
@@ -52,7 +52,7 @@ General:
 -v, --verbose                Be verbose in output.
 -h, --help                   Show this help and quit.
 
-Under construction:
+## Under construction:
     --required <arg>         Define parameters required when creating a package.
     --cd <arg>               Use <arg> as the current cache directory.
 	                          (Will fail if .CACHE_DB is not there.)
