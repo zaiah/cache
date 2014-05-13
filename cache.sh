@@ -149,16 +149,17 @@ get_position() {
 		# Get positions.
 		END_OF_FILE=`sed -n '$=' $cfile 2>/dev/null`
 		CURRENT_FILE_POS=`sed -n "/^$cline/ =" $cfile  2>/dev/null`
-#echo ${ARR_ELEMENTS[@]}
+		#echo ${ARR_ELEMENTS[@]}
+
 		# Have we reached the end of the file?  Say so.
 		[ $END_OF_FILE -eq $CURRENT_FILE_POS ] && {
 			echo "We've reached the end of $cfile"
 			# Remove the file from the array. (or lower the level)
 			for n in ${ARR_ELEMENTS[@]}; do
 				if [ $n == $cfile ]; then
-					echo in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
+#					echo in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
 					arr -x "$n" --from ARR_ELEMENTS
-					echo Now in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
+#					echo Now in ARR_ELEMENTS: ${ARR_ELEMENTS[@]}
 #					sed "/^${1}$/d" $cfile
 				fi
 			done
@@ -167,6 +168,11 @@ get_position() {
 		}
 	}
 }
+
+
+#declare -a LACK_DEPS
+#declare -a CHECK_DEPS
+#declare -a GRAB_DEPS 
 eat_dependencies() {
 	# if -f DEPENDENCIES
 	LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
@@ -178,8 +184,7 @@ eat_dependencies() {
 	[ -f "$1" ] && [[ `in_arr -a ARR_ELEMENTS -t "$1"` == "false" ]] && {
 		# Add the file.
 		arr --push "$1" --to ARR_ELEMENTS
-		echo ${ARR_ELEMENTS[@]}
-		read
+		# echo ${ARR_ELEMENTS[@]}
 
 		# Make sure that we're not over the array limit.
 		if [ ${#ARR_ELEMENTS[@]} -lt $ARR_DEPTH ]
@@ -187,24 +192,24 @@ eat_dependencies() {
 			# Then move through all the dependencies.
 			while read line
 			do
-					# Only move forward if not blank.
-					if [ ! -z "$line" ]
+				# Only move forward if not blank.
+				if [ ! -z "$line" ]
+				then
+					# Was it already run through?
+					echo "Checking for possibility of application '$line' already having been processed."
+					# [ -f "$CHECK_DEPS" ] && sed -n "/^${line}|/p" $CHECK_DEPS 
+
+					# We have it, skip it.
+					if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^${line}|/p" $CHECK_DEPS`" ] 
 					then
-						# Was it already run through?
-						echo "Checking for possibility of application '$line' already having been processed."
-					sed -n "/^${line}$/p" $CHECK_DEPS #2>/dev/stderr
+						echo "File $line was already found on the system."
+						get_position $1 $line
+						continue
 
-						# We have it, skip it.
-						if [ -f "$CHECK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $CHECK_DEPS`" ] 
-						then
-							echo "File $line was already found on the system."
-							get_position $1 $line
-							continue
-
-						# We don't have it, skip it.
-						elif [ -f "$LACK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $LACK_DEPS`" ] 
-						then
-							echo "File $line was already marked as not present on the system."
+					# We don't have it, skip it.
+					elif [ -f "$LACK_DEPS" ] && [ ! -z "`sed -n "/^${line}$/p" $LACK_DEPS`" ] 
+					then
+						echo "File $line was already marked as not present on the system."
 							get_position $1 $line
 							continue	
 
@@ -225,13 +230,14 @@ eat_dependencies() {
 							DEP_FOLDER="$CACHE_DIR/$(grep --line-number "|$line|" $CACHE_DB | \
 								sed 's/|/:/g' | \
 								awk -F ':' '{ print $4 }')"
-							sleep 1
 
 							# Does it exist?
 							if [ -d "$DEP_FOLDER" ]
 							then
 								# Make a record of the directory.
-								printf "$line\n" >> $CHECK_DEPS
+								printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
+								save_args -depchain "$line|$DEP_FOLDER"	
+								# printf "$line|$DEP_FOLDER\n" >> $CHECK_DEPS
 
 								# Have we reached the end of the file?
 								get_position $1 $line
@@ -1211,12 +1217,12 @@ FINGERPRINT=$FINGERPRINT"
 		awk -F ':' '{ print $4 }'`"
 
 	# Save it or die.
-	if [ -z "$SEED_FOLDER" ]
-	then
+	[ -z "$SEED_FOLDER" ] && {
 		error -e 1 -m "Cannot find source folder: $SEED_FOLDER for application '$BLOB'"
-	else	
-		save_args -depchain "$BLOB|$SEED_FOLDER"
-	fi
+	}
+#	else	
+#		save_args -depchain "$BLOB|$SEED_FOLDER"
+#	fi
 
 	# If there's a dependency list, loop through each entry 
 	# and pull those folders.
@@ -1226,29 +1232,105 @@ FINGERPRINT=$FINGERPRINT"
 
 		# Search through all the entries here.
 		[ -f "$DEPENDENCIES" ] && [ ! -z "`cat $DEPENDENCIES`" ] &&  {
-			# Set the first file name to iterate through.
-			# ARR_ELEMENTS=( $DEPENDENCIES )
-
 			# Go through and process the list.
 			eat_dependencies $DEPENDENCIES
-		
-			# Save both to the dependency chain.
 		}
-	}
-	exit
-	# Compile a list of the application id and it's dependencies.
-	# For each dependency, save it to arg. 
-		
-	
-		# Get the application's folder if available, dying if not.
-		# (Unless ignoring dependencies.)
 
-		# Change directory and switch to *CURRENT branch unless not default. 
+		# Error out depending on choices.
+		[ -f "$LACK_DEPS" ] && [ ! -z "`cat $LACK_DEPS`" ] && {
+			error -m "Missing the following packages:" -p cache
+			while read line 
+			do
+				printf "${line}\n"
+			done < $LACK_DEPS
+			error -m "Stopping installation of $BLOB." -e 1 -p cache
+		}
+
+	}
+
+	# Expand the destination directory if not absolute.
+	LINK_TO=`get_fullpath $LINK_TO`
+
+	# Error out if the folder exists.
+	[ ! -d "$LINK_TO" ] && mkdir -pv "$LINK_TO" 
+		#error -e 1 -m "'$LINK_TO' already exists.\nNot relinking." -p "cache"
+	# }
+
+	# Set linking flags.
+	[ ! -z $VERBOSE ] && LN_FLAGS="-v" || LN_FLAGS=
+	[ ! -z $DO_SYMLINK_TO ] && LN_FLAGS="-s $LN_FLAGS" 
+
+	# Save the SEED_FOLDER last.
+	save_args -depchain "$BLOB|$SEED_FOLDER"
+	echo "Here is our final dependency list."
+
+	# Show me what's been selected.
+	save_args -dump depchain | {
+	FN="`cat /dev/stdin`"
+	while read line	
+	do
+		printf "$line\n" | sed 's/|/\t/'
+	done < $FN
+	}
+
+	# Dump all dependencies and go through and add them in.
+	save_args -dump depchain | {
+	FN="`cat /dev/stdin`"
+	while read line	
+	do	
+		# Blank lines?
+		[ -z "$line" ] && continue
+
+		# Run the linking
+		BLOB_NAME="`printf ${line} | awk -F '|' '{ print $1 }'`"
+		BLOB_ROOT="`printf ${line} | awk -F '|' '{ print $2 }'`"
+		NO_LINK="$BLOB_ROOT/.linkignore"
+
+		# Change directory and switch to *CURRENT branch 
+		# unless not default. 
+		cd $BLOB_ROOT
+		# cat VERSIONS
+		# ls
+		# git stash?
+
+		# If this is the first time something has been added, it's possible
+		# that there will be no *CURRENT branch.  So we use *INITIAL instead.
+		if [ -z "`sed -n '/*CURRENT/p' $BLOB_ROOT/VERSIONS`" ]
+		then
+			git checkout `sed -n '$p' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
+		else
+			git checkout `grep '*CURRENT' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
+		fi
 
 		# Link while we are on this branch.
+		# Get a full directory listing.  -print0?
+		for LINK_FILE in `find $BLOB_ROOT | grep -v '.git'` 
+		do
+			# Define a relative root, always cutting the trailing slash.
+			RELATIVE_ROOT="$BLOB_NAME/$(printf "%s" $LINK_FILE | \
+				sed "s#${BLOB_ROOT}##" | sed 's#^/##')"
+
+			# Make any directories.
+			[ -d "$LINK_FILE" ] && {
+				mkdir -pv $LINK_TO/$RELATIVE_ROOT
+				continue
+			}
+
+			# Hard or soft link any files.
+			[ -f "$LINK_FILE" ] && {
+				[ -z "$(sed -n "/^$(basename $LINK_FILE)/p" $NO_LINK)" ] && { 
+					ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
+					continue
+				}
+			}
+		done
 
 		# Switch back to 'master'
-
+		git checkout master
+		cd - 
+	done < $FN
+	}
+exit
 
 	# Find entry.
 	FOLDER=`grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | \
