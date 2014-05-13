@@ -7,7 +7,7 @@
 #-----------------------------------------------------#
 # Licensing
 # ---------
-# Copyright (c) <year> <copyright holders>
+# Copyright (c) 2014 Vent Industries, LLC
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -140,7 +140,6 @@ save_args() {
 # eat_dependencies
 ARR_ELEMENTS=
 ARR_DEPTH=20
-
 get_position() {
 	cfile=$1
 	cline=$2
@@ -163,8 +162,6 @@ get_position() {
 #					sed "/^${1}$/d" $cfile
 				fi
 			done
-
-			# Do some other cool stuff.  
 		}
 	}
 }
@@ -311,9 +308,6 @@ Parameter tuning:
 
 General:
     --set-cache-dir <arg>    Set the cache directory to <arg>
-    --required <arg>         Define parameters required when creating a package.
-    --cd <arg>               Use <arg> as the current cache directory.
-	                          (Will fail if .CACHE_DB is not there.)
 -i, --info <pkg>             Display all information about a package.
 	 --list-versions <arg>    List all the versions out.
     --contents <pkg>         Display all contents of a package.
@@ -324,6 +318,11 @@ General:
     --uninstall              Uninstall this. 
 -v, --verbose                Be verbose in output.
 -h, --help                   Show this help and quit.
+
+Under construction:
+    --required <arg>         Define parameters required when creating a package.
+    --cd <arg>               Use <arg> as the current cache directory.
+	                          (Will fail if .CACHE_DB is not there.)
 "
    exit $STATUS
 }
@@ -439,56 +438,56 @@ do
          shift
          UUID="$1"
       ;;
-     --description)
-         DO_DESCRIPTION=true
-         shift
-			save_args -args "DESCRIPTION=$1"
-      ;;
-     -t|--title)
-         DO_TITLE=true
-         shift
-         save_args -args "TITLE=$1"
-      ;;
-     -n|--namespace)
-         DO_NAMESPACE=true
-         shift
-         save_args -args "NAMESPACE=$1"
-      ;;
-     -u|--url)
-         DO_URL=true
-         shift
-         save_args -args "URL=$1"
-      ;;
+#     --description)
+#         DO_DESCRIPTION=true
+#         shift
+#			save_args -args "DESCRIPTION=$1"
+#      ;;
+#     -t|--title)
+#         DO_TITLE=true
+#         shift
+#         save_args -args "TITLE=$1"
+#      ;;
+#     -n|--namespace)
+#         DO_NAMESPACE=true
+#         shift
+#         save_args -args "NAMESPACE=$1"
+#      ;;
+#     -u|--url)
+#         DO_URL=true
+#         shift
+#         save_args -args "URL=$1"
+#      ;;
      --produced-on)
          DO_PRODUCED_ON=true
          shift
          save_args -args "PRODUCED_ON=$1"
       ;;
-     --authors)
+     -a|--authors)
          DO_AUTHORS=true
          shift
          save_args -args "AUTHORS=$1"
       ;;
-     --primary-author)
-         DO_AUTHORS=true
-         shift
-         save_args -args "PRIMARY_AUTHOR=$1"
-      ;;
-     --signature)
-         DO_SIGNATURE=true
-         shift
-         save_args -args "SIGNATURE=$1"
-      ;;
-     --key)
-         DO_KEY=true
-         shift
-         save_args -args "KEY=$1"
-      ;;
-     --fingerprint)
-         DO_FINGERPRINT=true
-         shift
-         save_args -args "FINGERPRINT=$1"
-      ;;
+#     --primary-author)
+#         DO_AUTHORS=true
+#         shift
+#         save_args -args "PRIMARY_AUTHOR=$1"
+#      ;;
+#     --signature)
+#         DO_SIGNATURE=true
+#         shift
+#         save_args -args "SIGNATURE=$1"
+#      ;;
+#     --key)
+#         DO_KEY=true
+#         shift
+#         save_args -args "KEY=$1"
+#      ;;
+#     --fingerprint)
+#         DO_FINGERPRINT=true
+#         shift
+#         save_args -args "FINGERPRINT=$1"
+#      ;;
      --extra)
          DO_EXTRA=true
          shift
@@ -544,40 +543,37 @@ do
      -h|--help)
         usage 0
       ;;
-	  --echo)
-		  
-		;;
-	  --test)
-		  shift
-		  case "$1" in 
-			  args) TEST=args;;
-			  deps) TEST=deps;;
-			  gi) TEST=gi;;
-			  li) TEST=li;;
-			  ex) TEST=ex;;
-	     esac
-		  save_args -dump $TEST | { 
-				FN=`cat /dev/stdin`
-				while read line 
-				do
-					[ ! -z "$line" ] && echo $line
-				done < $FN
-		  }
-		  exit
-		;;
-	  --reset)
-		  	source $BINDIR/.CACHE
-			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
-			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
-			exit
-		;;
-	  --total-reset)
-		  	source $BINDIR/.CACHE
-			init --uninstall
-			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
-			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
-			exit
-		;;
+#	  --test)
+#		  shift
+#		  case "$1" in 
+#			  args) TEST=args;;
+#			  deps) TEST=deps;;
+#			  gi) TEST=gi;;
+#			  li) TEST=li;;
+#			  ex) TEST=ex;;
+#	     esac
+#		  save_args -dump $TEST | { 
+#				FN=`cat /dev/stdin`
+#				while read line 
+#				do
+#					[ ! -z "$line" ] && echo $line
+#				done < $FN
+#		  }
+#		  exit
+#		;;
+#	  --reset)
+#		  	source $BINDIR/.CACHE
+#			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
+#			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
+#			exit
+#		;;
+#	  --total-reset)
+#		  	source $BINDIR/.CACHE
+#			init --uninstall
+#			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
+#			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
+#			exit
+#		;;
      --) break;;
      -*)
       printf "Unknown argument received: $1\n" > /dev/stderr;

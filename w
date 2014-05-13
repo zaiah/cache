@@ -1,1 +1,0 @@
-/home/zaiah/www/cache
