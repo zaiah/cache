@@ -4,17 +4,20 @@ x no-touch
 x no-mkdir
 x link-ignore
 x git-ignore
-ignore-needs
+x ignore-needs
+x remove dependency files in lieu of arrays
 version
 	dependencies use IDs and reference the CACHE_DB for new ones
-link-to
-x	single
-	multiple (account for autodependency (bring in both))
-freeze
+x regular copy
+x link-to
+	x	single
+	x	multiple (account for autodependency (bring in both))
+x freeze
 uninit (remove from git history)
 setup (put in setup mode and do the following)
 	required
-	set-cache-dir
+x	set-cache-dir
+cache options thing (unsure how to update all of them at once)
 
 test suite for everything (this MUST work pretty much all the time)
 
@@ -36,9 +39,10 @@ x	-m, --commit <arg>           Commit changes to a package.
 x	-n, --needs <arg>            Set a dependence. 
 x	-x, --no-longer-needs <arg>  Unset a dependency. 
 x		--list-needs <arg>        Set a dependence. 
-    	--ignore-needs           Disregard dependencies. 
+x    	--ignore-needs           Disregard dependencies. 
 		--list-versions <arg>     List all the versions out.
 x	-k, --link-to <arg>          Put a package somewhere.
+x	    --copy-to <arg>             Put a package somewhere.
 x		--symlink-to <arg>        Put a package somewhere.
 x		--link-ignore <arg>       Ignore these when linking out.
 x		--git-ignore <arg>        Ignore these when committing.

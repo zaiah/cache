@@ -1,5 +1,5 @@
 
-CACHE_DIR=/appcache
+CACHE_DIR=/home/zaiah/projects/cache/applications
 CACHE_DB="$CACHE_DIR/.CACHE_DB"
 DEFAULT_VERSION=0.01
 COPY_TYPE=LINKED                 # LINKED, STATIC

@@ -5,6 +5,7 @@ cache=/home/zaiah/projects/cache {
  README.md
  checklist
  cache.sh
+ development.sh
  cache.vim
  gen.sh
  applications=applications {

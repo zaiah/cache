@@ -85,9 +85,8 @@ version() {
 }
 
 
-
-
 # Choose from array, this is VERY bad programming.  Stop being lazy.
+AVAR=
 SVAR=
 DVAR=
 GIVAR=
@@ -100,6 +99,7 @@ save_args() {
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
+			-files) shift; AVAR="$SVAR\n$1";;
 			-args) shift; SVAR="$SVAR\n$1";;
 			-deps) shift; DVAR="$DVAR\n$1";;
 			-gi) 	shift; GIVAR="$GIVAR\n$1";;
@@ -113,6 +113,7 @@ save_args() {
 				local TERM=
 				case "$1" in
 					args) TERM="$SVAR" ;;
+					files) TERM="$AVAR" ;;
 					deps) TERM="$DVAR" ;;
 					gi) TERM="$GIVAR" ;;
 					li) TERM="$LIVAR" ;;
@@ -170,10 +171,10 @@ get_position() {
 #declare -a LACK_DEPS
 #declare -a CHECK_DEPS
 #declare -a GRAB_DEPS 
+tmp_file -n LACK_DEPS
+tmp_file -n CHECK_DEPS
+tmp_file -n GRAB_DEPS
 eat_dependencies() {
-	LACK_DEPS="$CACHE_DIR/tmp/lack"		# Generate?
-	CHECK_DEPS="$CACHE_DIR/tmp/check"	# Generate?
-	GRAB_DEPS="$CACHE_DIR/tmp/grab"		# Generate?
 
 	# ...
 	[ -f "$1" ] && [[ `in_arr -a ARR_ELEMENTS -t "$1"` == "false" ]] && {
@@ -191,7 +192,8 @@ eat_dependencies() {
 				if [ ! -z "$line" ]
 				then
 					# Was it already run through?
-					# printf "Checking for possibility of application '$line' already having been processed."
+					# printf "Checking for possibility of application '$line'\n" 
+					# printf "already having been processed."
 
 					# We have it, skip it.
 					# if [ `in_arr -a CHECK_DEPS -t "$line"` ]
@@ -261,8 +263,8 @@ eat_dependencies() {
 					fi	
 				fi
 			done < $1 
+		# ...
 		else
-			# error...
 			error \
 				-m "The dependency chain is too deep for the limit imposed." \
 				-p "cache" -e 1
@@ -283,6 +285,8 @@ Database stuff:
     --mkdir <arg>            Make additional directories. 
     --touch <arg>            Create additional files.
 -r, --remove <arg>           Remove a package. 
+    --register <arg>         Register a package.
+    --unregister <arg>       Unregister a package. 
 -u, --update <arg>           Update a package. 
 -m, --commit <arg>           Commit changes to a package.
     --master <arg>           Update the master branch. 
@@ -320,7 +324,8 @@ General:
 -h, --help                   Show this help and quit.
 
 Under construction:
-    --required <arg>         Define parameters required when creating a package.
+    --required <arg>         Define parameters required when making a package.
+    --populate <arg>         Populate from somewhere.
     --cd <arg>               Use <arg> as the current cache directory.
 	                          (Will fail if .CACHE_DB is not there.)
 "
@@ -331,8 +336,6 @@ Under construction:
 # Die if no arguments received.
 [ -z "$BASH_ARGV" ] && printf "Nothing to do\n" > /dev/stderr && usage 1
 
-
-# Need an array. (or big string)
 
 # Process options.
 while [ $# -gt 0 ]
@@ -384,6 +387,16 @@ do
 			shift
 			LINK_TO="$1"
 		;;
+	  --freeze)
+		   DO_FREEZE=true
+			shift
+			FREEZE_AT="$1"
+		;;
+	  --copy-to)
+		   DO_COPY_TO=true
+			shift
+			LINK_TO="$1"
+		;;
 	  --git-ignore) 
 		   DO_GIT_IGNORE=true
 		   shift
@@ -423,6 +436,9 @@ do
 			shift
 			BLOB="$1"
       ;;
+     --ignore-needs)
+         DO_IGNORE_NEEDS=true
+      ;;
      -s|--summary)
          DO_SUMMARY=true
          shift
@@ -438,26 +454,6 @@ do
          shift
          UUID="$1"
       ;;
-#     --description)
-#         DO_DESCRIPTION=true
-#         shift
-#			save_args -args "DESCRIPTION=$1"
-#      ;;
-#     -t|--title)
-#         DO_TITLE=true
-#         shift
-#         save_args -args "TITLE=$1"
-#      ;;
-#     -n|--namespace)
-#         DO_NAMESPACE=true
-#         shift
-#         save_args -args "NAMESPACE=$1"
-#      ;;
-#     -u|--url)
-#         DO_URL=true
-#         shift
-#         save_args -args "URL=$1"
-#      ;;
      --produced-on)
          DO_PRODUCED_ON=true
          shift
@@ -468,26 +464,6 @@ do
          shift
          save_args -args "AUTHORS=$1"
       ;;
-#     --primary-author)
-#         DO_AUTHORS=true
-#         shift
-#         save_args -args "PRIMARY_AUTHOR=$1"
-#      ;;
-#     --signature)
-#         DO_SIGNATURE=true
-#         shift
-#         save_args -args "SIGNATURE=$1"
-#      ;;
-#     --key)
-#         DO_KEY=true
-#         shift
-#         save_args -args "KEY=$1"
-#      ;;
-#     --fingerprint)
-#         DO_FINGERPRINT=true
-#         shift
-#         save_args -args "FINGERPRINT=$1"
-#      ;;
      --extra)
          DO_EXTRA=true
          shift
@@ -498,6 +474,12 @@ do
 		   shift
          CACHE_DIR="$1"
       ;;
+     -z|--cache-options)
+		   DO_ADD_CACHE_OPTIONS=true
+			shift
+			CO="`printf "$1" | tr [a-z] [A-Z] | tr '[:blank:]' _ | tr - _`"
+			save_args -args "${CO}"
+		;;
      --install)
          DO_INSTALL=true
          shift
@@ -508,6 +490,16 @@ do
       ;;
      --dist-info)
          DO_DIST_INFO=true
+      ;;
+	  --register)
+         DO_REGISTER=true
+         shift
+         AT="$1"
+      ;;
+     --convert)
+         DO_CONVERT=true
+         shift
+         AT="$1"
       ;;
      --cd)
          DO_CHANGE_DIR=true
@@ -537,43 +529,13 @@ do
      -l|--list)
         DO_LIST=true
       ;;
+	 # `` 
      -v|--verbose)
         VERBOSE=true
       ;;
      -h|--help)
         usage 0
       ;;
-#	  --test)
-#		  shift
-#		  case "$1" in 
-#			  args) TEST=args;;
-#			  deps) TEST=deps;;
-#			  gi) TEST=gi;;
-#			  li) TEST=li;;
-#			  ex) TEST=ex;;
-#	     esac
-#		  save_args -dump $TEST | { 
-#				FN=`cat /dev/stdin`
-#				while read line 
-#				do
-#					[ ! -z "$line" ] && echo $line
-#				done < $FN
-#		  }
-#		  exit
-#		;;
-#	  --reset)
-#		  	source $BINDIR/.CACHE
-#			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
-#			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
-#			exit
-#		;;
-#	  --total-reset)
-#		  	source $BINDIR/.CACHE
-#			init --uninstall
-#			[ -d "$CACHE_DIR" ] && rm -rfv $CACHE_DIR
-#			[ -f "$BINDIR/.CACHE" ] && rm -v $BINDIR/.CACHE
-#			exit
-#		;;
      --) break;;
      -*)
       printf "Unknown argument received: $1\n" > /dev/stderr;
@@ -585,7 +547,6 @@ shift
 done
 
 
-# Install...
 # install
 [ ! -z $DO_INSTALL ] && {
 	# Check for missing stuff.
@@ -661,6 +622,30 @@ fi
 
 # Grab the CACHE_CONFIG
 source $CACHE_CONFIG
+CACHE_OPTIONS="$CACHE_DIR/.CACHE_OPTIONS"
+
+
+# Create a CACHE options file.  Carries all additional options for cache.
+[ ! -z $DO_ADD_CACHE_OPTIONS ] && {
+	# Cache options
+	[ ! -f "$CACHE_OPTIONS" ] && touch $CACHE_OPTIONS
+
+	# Dump all the cache options supplied.
+	save_args -dump args | { FN="`cat /dev/stdin`"; 
+		while read line
+		do
+			[ ! -z "$line" ] && {
+				for arg in $(printf "$line\n" | sed "s/,/ /g")
+				do
+					# If the text is not found, write it.
+					[ -z `sed "/${arg}=/p" $CACHE_OPTIONS` ] && {
+						printf "${arg}=\n" > /dev/stdout
+					}
+				done
+			}
+		done < $FN
+	}
+}
 
 
 # Basic information...
@@ -703,6 +688,7 @@ source $CACHE_CONFIG
 	}' $CACHE_DB 
 }
 
+
 # Get information on your current instance of cache.
 [ ! -z $DO_DIST_INFO ] && { 
 	source $CACHE_CONFIG
@@ -716,39 +702,56 @@ source $CACHE_CONFIG
 	printf "Default global key:       ${REMOTE_GLOBAL_KEY:-None}\n"
 }
 
-## Packages
+
 # exists
 [ ! -z $DO_EXISTS ] && not_exists $BLOB
 
-# required
-[ ! -z $DO_REQUIRED ] && {
-   printf '' > /dev/null
-}
-
 
 # create
-[ ! -z $DO_CREATE ] && {
+[ ! -z $DO_CREATE ] || [ ! -z "$DO_CONVERT" ] && {
 	# Title and summary are always required.
 	[ -z "$SUMMARY" ] && {
 		error -p "$PROGRAM" -e 1 -m "No summary specified."
 	}
 
-	# Check for the name first.
-	exists $BLOB
+	# If converting,move through a couple of additional checks.
+	[ ! -z "$DO_CONVERT" ] && {
+		# Make sure that $AT is a file (and not something else)
+		[ -z "$AT" ] && error -e 1 -m "No file to convert supplied." -p cache
+
+		# Files
+		[ ! -f "$AT" ] && {
+			error -m "File '$AT' either does not exist or is not a file." \
+				-e 1 -p cache
+		}
+
+		# If it's got an extension, cut it and use it as the name?
+		# The -b option can supply a name in this case.
+		if [ -z "$BLOB" ]
+		then
+			NAME=`basename ${AT}`
+			NAME=${NAME%.*}		# Should alwyas just cut the extension.
+		else
+			NAME="$BLOB"
+		fi
+	}
+
+	# Check for a valid name. 
+	exists ${NAME:-$BLOB}
 
 	# Get some defaults.
 	UUID=${UUID-`rand`}
-	TITLE=${TITLE-$BLOB}
+	TITLE=${NAME:-$BLOB}
 
 	# Handle folder names.
 	case "$FORMAT" in 
-		DATESTAMP) FORMAT="$(date +%F).$(date +%s)" ;;
-		UUID) FORMAT="`rand | head -c 20`" ;;
+		DATESTAMP) 	FORMAT="$(date +%F).$(date +%s)";;
+		UUID) 		FORMAT="`rand | head -c 20`";;
 		# CUSTOM) FORMAT="$(date +%F).$(date +%s)" ;;
 	esac
 
 	# Common vars and files.
-	FOLDER="$CACHE_DIR/${BLOB}.${FORMAT}"
+	FOLDER="$CACHE_DIR/${TITLE}.${FORMAT}"
 	DEPENDENCIES="$FOLDER/DEPENDENCIES"
 	MANIFEST="$FOLDER/MANIFEST"
 	VERSIONS="$FOLDER/VERSIONS"
@@ -758,21 +761,17 @@ source $CACHE_CONFIG
 	LINKIGNORE="$FOLDER/.linkignore"
 
 	FILE_ARR=(
-		"$FOLDER" 
-		"$DEPENDENCIES" 
-		"$MANIFEST" 
-		"$VERSIONS" 
-		"$INSTALL" 
+		"$FOLDER"
+		"$DEPENDENCIES"
+		"$MANIFEST"
+		"$VERSIONS"
+		"$INSTALL"
 		"$README"
 		"$GITIGNORE"
 		"$LINKIGNORE"
 	)
 
-	DIR_ARR=(
-		"$FOLDER/src"
-		"$FOLDER/tests"
-		"$FOLDER/docs"
-	)
+	DIR_ARR=( "$FOLDER/src" "$FOLDER/tests" "$FOLDER/docs" )
 
 	# If the folder doesn't exist already, then create it.
 	[ ! -d "$FOLDER" ] && mkdir -pv $FOLDER
@@ -797,10 +796,7 @@ NAMESPACE=$NAMESPACE
 URL=$URL
 ARCHIVE=$ARCHIVE
 PRODUCED_ON=$PRODUCED_ON
-AUTHORS=$AUTHORS
-SIGNATURE=$SIGNATURE
-KEY=$KEY
-FINGERPRINT=$FINGERPRINT"
+AUTHORS=$AUTHORS"
 	} > $MANIFEST
 
 	# Do not link certain files by default.
@@ -810,7 +806,7 @@ FINGERPRINT=$FINGERPRINT"
 	#
 
 	# Do not track VERSION by default.
-	echo VERSIONS >> $GITIGNORE
+	printf "VERSIONS\n" >> $GITIGNORE
 	
 	# A file called SUMMARY can keep all important information in one place.
 
@@ -833,9 +829,12 @@ FINGERPRINT=$FINGERPRINT"
 		printf "\n"
 	} > $VERSIONS
 
+	# Keep source or not?
+	[ ! -z $DO_CONVERT ] && cp -v $AT $FOLDER 
 
 	# Finally, start with the version control madness.
 	cd $FOLDER
+	
 	#echo "Initializing Git repository for $BLOB..."
 	git init
 	#echo "Adding all files..."
@@ -963,6 +962,15 @@ FINGERPRINT=$FINGERPRINT"
 			}
 		done < $FN
 	}
+}
+
+
+# Register something that's already been built.
+[ ! -z $DO_REGISTER ] && {
+	# ...
+	printf '' > /dev/null
+
+	# ...
 }
 
 
@@ -1198,16 +1206,39 @@ FINGERPRINT=$FINGERPRINT"
 
 
 # assess needs (are all the dependencies on this system?)
-[ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
+# [ ! -z $DO_ASSESS_NEEDS ] && { printf '' > /dev/null; }
+
+
+# Freeze
+[ ! -z $DO_FREEZE ] && { 
+  	# Make sure an application and freeze directory has been specified.
+	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
+	[ -z "$FREEZE_AT" ] && error -e 1 -m "No directory to freeze." -p "cache"
+
+	# Check the application's existence.
+	not_exists $BLOB
+
+	# Choose the directory where the application is. 
+	FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+
+	# Do a find on the directory where the file is?
+	FREEZE_AT="`get_fullpath $FREEZE_AT`"
+
+	# Seems you can just totally delete this, and remake it. 
+	# Linking it could be tough though.
+	rm -rf $FREEZE_AT/*
+	cp -rv $FOLDER/* $FREEZE_AT
+}
 
 
 # Link to
-[ ! -z $DO_LINK_TO ] || [ ! -z $DO_SYMLINK_TO ] && {
+[ ! -z $DO_LINK_TO ] || [ ! -z $DO_SYMLINK_TO ] || [ ! -z $DO_COPY_TO ] && {
   	# Make sure an application and destination directory has been specified.
 	[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "cache"
 	[ -z "$LINK_TO" ] && error -e 1 -m "No location specified for linking." -p "cache"
 	
-	# Make sure the main application exists.  Initial folder search will fail if not.
+	# Make sure the main application exists.  
+	# Initial folder search will fail if not.
 	not_exists "$BLOB"
 
 	# Also get the initial folder. 
@@ -1296,28 +1327,36 @@ FINGERPRINT=$FINGERPRINT"
 			git checkout `grep '*CURRENT' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
 		fi
 
+
+		# Copy
+		[ ! -z "$DO_COPY_TO" ] && {
+			cp -rv $BLOB_ROOT ${LINK_TO}/$BLOB_NAME
+		}
+
 		# Link while we are on this branch.
 		# Get a full directory listing.  -print0?
-		for LINK_FILE in `find $BLOB_ROOT | grep -v '.git'` 
-		do
-			# Define a relative root, always cutting the trailing slash.
-			RELATIVE_ROOT="$BLOB_NAME/$(printf "%s" $LINK_FILE | \
-				sed "s#${BLOB_ROOT}##" | sed 's#^/##')"
+		[ ! -z "$DO_LINK_TO" ] && {
+			for LINK_FILE in `find $BLOB_ROOT | grep -v '.git'` 
+			do
+				# Define a relative root, always cutting the trailing slash.
+				RELATIVE_ROOT="$BLOB_NAME/$(printf "%s" $LINK_FILE | \
+					sed "s#${BLOB_ROOT}##" | sed 's#^/##')"
 
-			# Make any directories.
-			[ -d "$LINK_FILE" ] && {
-				mkdir -pv $LINK_TO/$RELATIVE_ROOT
-				continue
-			}
-
-			# Hard or soft link any files.
-			[ -f "$LINK_FILE" ] && {
-				[ -z "$(sed -n "/^$(basename $LINK_FILE)/p" $NO_LINK)" ] && { 
-					ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
+				# Make any directories.
+				[ -d "$LINK_FILE" ] && {
+					mkdir -pv $LINK_TO/$RELATIVE_ROOT
 					continue
 				}
-			}
-		done
+
+				# Hard or soft link any files.
+				[ -f "$LINK_FILE" ] && {
+					[ -z "$(sed -n "/^$(basename $LINK_FILE)/p" $NO_LINK)" ] && { 
+						ln $LN_FLAGS $LINK_FILE $LINK_TO/$RELATIVE_ROOT
+						continue
+					}
+				}
+			done
+		}
 
 		# Switch back to 'master'
 		git checkout master

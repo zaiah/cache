@@ -65,5 +65,33 @@ A quick guide to the command line options is listed below:
 
 ## Demo Cases
 Using some sh code we can see more or less how this would be used.
+<pre>
+# Creates a new application (the verbose way)
+#
+# Makes all folders and files.
+# May handle permissions in the future (--chmod)
+# Can suspend file creation if need be (--no-files). 
+# Can suspend folder creation as well (--no-dirs). 
+# Can suspend version control (--no-vc).  Breaks versioning though.
+cache \
+	--create $APP_NAME \
+	--summary "<from kirk script, none if nothing supplied" \
+	--no-files \		# Will still include DEPENDENCIES and HISTORY
+	--mkdir "css" \
+	--mkdir "extern" \
+	--mkdir "js" \
+	--mkdir "lua" \
+	--mkdir "html/static" \
+	--mkdir "storage" \
+	--mkdir "templates" \
+	--touch "CHANGELOG.md" \
+	--touch "LICENSE.md" \
+	--touch "README.md" \
+	--touch "$APP_NAME.lua" \
+	--touch "tests/{up,down,left,right}.lua" \
+	--touch "extern/Makefile"
+</pre>
 
-Check in the 'examples' directory for some common uses.
+<p>
+Check in the 'examples' directory for some additional uses.
+</p>
