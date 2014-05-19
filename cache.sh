@@ -624,6 +624,9 @@ fi
 source $CACHE_CONFIG
 CACHE_OPTIONS="$CACHE_DIR/.CACHE_OPTIONS"
 
+# Not sure why we have to create a database everytime, but it should be there.
+[ ! -f "$CACHE_DB" ] && touch $CACHE_DB
+	
 
 # Create a CACHE options file.  Carries all additional options for cache.
 [ ! -z $DO_ADD_CACHE_OPTIONS ] && {
