@@ -100,6 +100,7 @@ function cache () {
 		# Unsets
 		unset LIBPROGRAM MESSAGE EXIT_CODE DO_STDERR VERBOSE
 	}
+
 	# Fetch a random number out of nowhere.
 	rand() { random -l 40 | sed 's#/#_#g' | sed 's#=#+#g'; }
 	
@@ -475,6 +476,12 @@ function cache () {
 	     --merge)
 	         DO_MERGE_MASTER=true
 	      ;;
+	     --use-branches)
+	         USE_BRANCHES=true
+	      ;;
+	     --use-master)
+	         USE_MASTER=true
+	      ;;
 	     -n|--needs)
 	         DO_NEEDS=true
 	         shift
@@ -841,15 +848,15 @@ REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
 		# Put this manifest somewhere.
 		{
 			echo "VERSION=${VERSION-$DEFAULT_VERSION}
-	UUID=$UUID
-	DESCRIPTION='$DESCRIPTION'
-	SUMMARY='$SUMMARY'
-	TITLE='$TITLE'
-	NAMESPACE=$NAMESPACE
-	URL=$URL
-	ARCHIVE=$ARCHIVE
-	PRODUCED_ON=$PRODUCED_ON
-	AUTHORS=$AUTHORS"
+UUID=$UUID
+DESCRIPTION='$DESCRIPTION'
+SUMMARY='$SUMMARY'
+TITLE='$TITLE'
+NAMESPACE=$NAMESPACE
+URL=$URL
+ARCHIVE=$ARCHIVE
+PRODUCED_ON=$PRODUCED_ON
+AUTHORS=$AUTHORS"
 		} > $MANIFEST
 	
 		# Do not track VERSION by default.
@@ -878,23 +885,17 @@ REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
 		[ ! -z $DO_CONVERT ] && cp -v $AT $FOLDER 
 	
 		# Finally, start with the version control madness.
-		cd $FOLDER
-		
 		#echo "Initializing Git repository for $BLOB..."
+		cd $FOLDER
 		git init
-		#echo "Adding all files..."
 		git add .
-		# GIT_ID=`sed -n -e '/^UUID=/p' $FOLDER/MANIFEST | sed 's/UUID=//'`
-		#echo "Running initial commit..."
 		git commit -m "cache_$CURRENT_VERSION committed on `date`"
-		#echo "Creating new branch for $CURRENT_VERSION..."
-		git branch "$CURRENT_VERSION"		
-		if [ -z `git branch | grep -v 'master'` ] 
-		then
-			error -m "Not able to track '$BLOB' repository." -p "$PROGRAM"
-		else
-			echo "Repository creation successful."
-		fi
+		[ ! -z $USE_BRANCHES ] && { 
+			printf '' > /dev/null
+			# git branch "$CURRENT_VERSION"		
+			# [ -z `git branch | grep -v 'master'` ] && error -m "Not able to track '$BLOB' repository." -p "$PROGRAM"
+		}	
+		# echo "Repository creation successful."
 		cd $CURRENT_PATH
 	}
 	
@@ -1085,43 +1086,34 @@ REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
 		# Replace the current versions.
 		sed -i 's/*CURRENT/*CHECKPOINT/' $VERSIONS
 	
-		# echo "Changing to directory: $FOLDER..."
-		# Don't make a new branch, just do the regular thing.
-		if [ ! -z "$DO_COMMIT_MASTER" ]; then
-			# Make a commit in the master branch.
-			cd $FOLDER
-			git add .
-			git commit -m "cache $CURRENT_VERSION - `date`"
-			cd $CURRENT_PATH
+		# Print the new copy off.
+		CURRENT_VERSION=`rand`
+		{ 
+			printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
+			printf "$CURRENT_VERSION|"
+			printf "`date`|"
+			printf "$VERSION_NAME|"
+			printf "*CURRENT" 
+			printf "\n"
+		} >> $VERSIONS
 
-
-		# Make a new branch.
-		else
-			# Print the new copy off.
-			CURRENT_VERSION=`rand`
-			{ 
-				printf "$(( $(sed -n \$p $VERSIONS | awk -F '|' '{ print $1 }') + 1 ))|"
-				printf "$CURRENT_VERSION|"
-				printf "`date`|"
-				printf "$VERSION_NAME|"
-				printf "*CURRENT" 
-				printf "\n"
-			} >> $VERSIONS
-
-			# Create a new branch with changes.
-			cd $FOLDER
-			git add .
+		# Create a new branch with changes.
+		cd $FOLDER
+		git add .
+		git checkout master
+		# Check that you're on the master branch.
+		[ ! -z $USE_BRANCHES ] && { 
 			git branch $CURRENT_VERSION
 			git checkout $CURRENT_VERSION
-			git commit -m "cache $CURRENT_VERSION - `date`"
-			git checkout master
-			cd $CURRENT_PATH
+		}
+		git commit -m "cache $CURRENT_VERSION - `date`"
+		# git checkout master - only if not on master...
+		cd $CURRENT_PATH
 
-			# Merge the top (or a different branch) with the master branch.
-			[ ! -z "$DO_MERGE_MASTER" ] && {
-				git merge `awk -F '|' '{ print $2 }' $VERSIONS | tail -n 1`
-			}
-		fi
+		# Merge the top (or a different branch) with the master branch.
+		[ ! -z $USE_BRANCHES ] && [ ! -z "$DO_MERGE_MASTER" ] && {
+			git merge `awk -F '|' '{ print $2 }' $VERSIONS | tail -n 1`
+		}
 	}
 	
 	
@@ -1247,16 +1239,20 @@ REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
 		# List them out.
 		LIST=`cat $DEPENDENCIES | sed '/^$/d'`
 		COUNT=`cat $DEPENDENCIES | sed '/^$/d' | wc -l`
-		
-		if [ $COUNT -gt 1 ] 
-		then 
-			printf "$COUNT dependencies found for '$BLOB':\n"
-		elif [ $COUNT -eq 1 ]
-		then 
-			printf "$COUNT dependency found for '$BLOB':\n"
-		fi
 	
-		cat $DEPENDENCIES | awk -F '|' '{ print $1 }'
+		# Pretty should be an option.
+		[ ! -z $PRETTY ] && {
+			if [ $COUNT -gt 1 ] 
+			then 
+				printf "$COUNT dependencies found for '$BLOB':\n"
+			elif [ $COUNT -eq 1 ]
+			then 
+				printf "$COUNT dependency found for '$BLOB':\n"
+			fi
+		}
+
+		# Show the list.
+		cat $DEPENDENCIES | sed '/^$/d' | awk -F '|' '{ print $1 }' 
 	}
 	
 	
