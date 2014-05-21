@@ -352,12 +352,12 @@ Parameter tuning:
     --produced-on <arg>      Select a date.
 -a, --authors <arg>          Select or choose a set of authors. 
 -q, --extra <arg>            Supply key value pairs of whatever else 
-	                          should be tracked in a package. 
+                             should be tracked in a package. 
 	
 General:
     --set-cache-dir <arg>    Set the cache directory to <arg>
 -i, --info <pkg>             Display all information about a package.
-	 --list-versions <arg>    List all the versions out.
+    --list-versions <arg>    List all the versions out.
     --contents <pkg>         Display all contents of a package.
 -l, --list                   List all packages.
 -d, --directory              Where is an application's home directory? 
@@ -1080,12 +1080,16 @@ AUTHORS=$AUTHORS"
 		# Create a new branch with changes.
 		cd $FOLDER
 		git add .
-		git checkout master
+		# How to handle these errors when switching branches?
+		[ -z "`git branch | sed -n '/* master/p'`" ] && git checkout master
+
 		# Check that you're on the master branch.
 		[ ! -z $USE_BRANCHES ] && { 
 			git branch $CURRENT_VERSION
 			git checkout $CURRENT_VERSION
 		}
+
+		# Make a commit and go back.
 		git commit -m "cache $CURRENT_VERSION - `date`"
 		# git checkout master - only if not on master...
 		cd $CURRENT_PATH
@@ -1347,12 +1351,13 @@ AUTHORS=$AUTHORS"
 			# If this is the first time something has been added, it's possible
 			# that there will be no *CURRENT branch.  So we use *INITIAL instead.
 			# Version selection should be done here too.
-			if [ -z "`sed -n '/*CURRENT/p' $BLOB_ROOT/VERSIONS`" ]
-			then
-				git checkout `sed -n '$p' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
-			else
-				git checkout `grep '*CURRENT' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
-			fi
+			[ -z `git branch | sed -n '/* master/p'` ] && git checkout master
+			#if [ -z "`sed -n '/*CURRENT/p' $BLOB_ROOT/VERSIONS`" ]
+			#then
+			#	git checkout `sed -n '$p' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
+			#else
+			#	git checkout `grep '*CURRENT' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
+			#fi
 	
 	
 			# Copy
@@ -1383,7 +1388,7 @@ AUTHORS=$AUTHORS"
 			}
 	
 			# Switch back to 'master'
-			git checkout master
+			# git checkout master
 			cd - 
 		done < $FN
 		}
