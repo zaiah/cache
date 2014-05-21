@@ -324,63 +324,54 @@ function cache () {
 	   STATUS="${1:-0}"
 	   echo "Usage: ./$PROGRAM
 		[ -  ]
-	Database stuff:
-	-e, --exists <arg>           Does this file exist? 
-	-c, --create <arg>           Add a package. 
-	    --mkdir <arg>            Make additional directories. 
-	    --touch <arg>            Create additional files.
-	-r, --remove <arg>           Remove a package. 
-	    --register <arg>         Register a package.
-	    --unregister <arg>       Unregister a package. 
-	-u, --update <arg>           Update a package. 
-	-n, --needs <arg>            Set a dependence. 
-	-x, --no-longer-needs <arg>  Unset a dependency. 
-	    --list-needs <arg>       List <arg>'s dependencies.
-	    --ignore-needs           Disregard dependencies. 
-	-k, --link-to <arg>          Put a package somewhere.
-	    --symlink-to <arg>       Put a package somewhere.
-	    --link-ignore <arg>      Ignore these when linking out.
-	    --git-ignore <arg>       Ignore these when committing.
-	    --uninit <arg>           Remove all tracking information from git.
-	-b, --blob <arg>             Select by name. 
-	-u, --uuid <arg>             Select by unique identifier. 
+Database stuff:
+-e, --exists <arg>           Does this file exist? 
+-c, --create <arg>           Add a package. 
+    --mkdir <arg>            Make additional directories. 
+    --touch <arg>            Create additional files.
+-r, --remove <arg>           Remove a package. 
+    --register <arg>         Register a package.
+    --unregister <arg>       Unregister a package. 
+-u, --update <arg>           Update a package. 
+-n, --needs <arg>            Set a dependence. 
+-x, --no-longer-needs <arg>  Unset a dependency. 
+    --list-needs <arg>       List <arg>'s dependencies.
+    --ignore-needs           Disregard dependencies. 
+-k, --link-to <arg>          Put a package somewhere.
+    --symlink-to <arg>       Put a package somewhere.
+    --link-ignore <arg>      Ignore these when linking out.
+    --git-ignore <arg>       Ignore these when committing.
+    --uninit <arg>           Remove all tracking information from git.
+-b, --blob <arg>             Select by name. 
+-u, --uuid <arg>             Select by unique identifier. 
+-m, --commit <arg>           Commit changes to a package.
 
-	Merging:
-	-m, --commit <arg>           Commit changes to a package.
-	    --master <arg>           Update the master branch only, will not 
-		                          create a seperate branch for work.
-	    --merge                  Commit as usual, but merge current and 
-                                master branches. 
-	    --master-from <arg>      Update the master branch by merging with 
-		                          an unrelated branch <arg>.
+Parameter tuning:
+    --version <arg>          Select or choose version. 
+-s, --summary <arg>          Select or choose summary. 
+    --produced-on <arg>      Select a date.
+-a, --authors <arg>          Select or choose a set of authors. 
+-q, --extra <arg>            Supply key value pairs of whatever else 
+	                          should be tracked in a package. 
 	
-	Parameter tuning:
-	    --version <arg>          Select or choose version. 
-	-s, --summary <arg>          Select or choose summary. 
-	    --produced-on <arg>      Select a date.
-	-a, --authors <arg>          Select or choose a set of authors. 
-	-q, --extra <arg>            Supply key value pairs of whatever else 
-		                          should be tracked in a package. 
+General:
+    --set-cache-dir <arg>    Set the cache directory to <arg>
+-i, --info <pkg>             Display all information about a package.
+	 --list-versions <arg>    List all the versions out.
+    --contents <pkg>         Display all contents of a package.
+-l, --list                   List all packages.
+-d, --directory              Where is an application's home directory? 
+    --dist-info              Display information about how \`$PROGRAM\` is setup
+    --install <arg>          Install this to a certain location. 
+    --uninstall              Uninstall this. 
+-v, --verbose                Be verbose in output.
+-h, --help                   Show this help and quit.
 	
-	General:
-	    --set-cache-dir <arg>    Set the cache directory to <arg>
-	-i, --info <pkg>             Display all information about a package.
-		 --list-versions <arg>    List all the versions out.
-	    --contents <pkg>         Display all contents of a package.
-	-l, --list                   List all packages.
-	-d, --directory              Where is an application's home directory? 
-	    --dist-info              Display information about how \`$PROGRAM\` is setup
-	    --install <arg>          Install this to a certain location. 
-	    --uninstall              Uninstall this. 
-	-v, --verbose                Be verbose in output.
-	-h, --help                   Show this help and quit.
-	
-	Under construction:
-	    --required <arg>         Define parameters required when making a package.
-	    --populate <arg>         Populate from somewhere.
-	    --cd <arg>               Use <arg> as the current cache directory.
-		                          (Will fail if .CACHE_DB is not there.)
-	"
+Under construction:
+    --required <arg>         Define parameters required when making a package.
+    --populate <arg>         Populate from somewhere.
+    --cd <arg>               Use <arg> as the current cache directory.
+                             (Will fail if .CACHE_DB is not there.)"
 	   exit $STATUS
 	}
 	
@@ -468,19 +459,8 @@ function cache () {
 	         shift
 	         BLOB="$1"
 	      ;;
-	     --master)
-	         DO_COMMIT_MASTER=true
-	         shift
-	         BLOB="$1"
-	      ;;
-	     --merge)
-	         DO_MERGE_MASTER=true
-	      ;;
-	     --use-branches)
+	      --use-branches)
 	         USE_BRANCHES=true
-	      ;;
-	     --use-master)
-	         USE_MASTER=true
 	      ;;
 	     -n|--needs)
 	         DO_NEEDS=true

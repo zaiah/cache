@@ -1,13 +1,13 @@
 
 cache=/home/zaiah/projects/cache {
- DEPENDENCIES
- EXAMPLE_MANIFEST
+ DEPENDENCIES 
+ LICENSE
  README.md
- checklist
+ cache.old.sh
  cache.sh
- development.sh
  cache.vim
  gen.sh
+ libcache.sh
  applications=applications {
  }
  examples=examples {
