@@ -355,7 +355,8 @@ Database stuff:
 -b, --blob <arg>             Select by name. 
 -u, --uuid <arg>             Select by unique identifier. 
 -m, --commit <arg>           Commit changes to a package.
--p, --expand <arg>           Add additional files in <arg> to cache dir.
+-p, --push-from <arg>        Push additional files in <arg> to 
+                             application directory selected by --blob.
 
 Parameter tuning:
     --version <arg>          Select or choose version. 
@@ -572,7 +573,7 @@ Under construction:
 			  shift
 			  BLOB="$1"
 	      ;;
-		  -p|--expand-from)
+		  -p|--push-from|--pushback)
 			  DO_EXPAND=true
 			  shift
 			  EXPANSION_DIR="$1"
