@@ -29,7 +29,7 @@
 #-----------------------------------------------------#
 function cache () {
 	# Local variables
-	local ARCHIVE= ARGDUMP= ARR_DEPTH= ARR_ELEMENTS= AT= AUTHORS= AVAR= BINDIR= BLOB= BLOB_NAME= BLOB_ROOT= CACHE_CONFIG= CACHE_DB= CACHE_DIR= CACHE_OPTIONS= CHANGED_DIR= CO= COPY_TYPE= COUNT= CURRENT_FILE_POS= CURRENT_PATH= CURRENT_VERSION= CVAR= DEFAULT_VERSION= DEPENDENCIES= DEP_FOLDER= DESCRIPTION= DIR_ARR= DO_ADD_CACHE_OPTIONS= DO_AUTHORS= DO_CHANGE_DIR= DO_COMMIT= DO_COMMIT_MASTER= DO_CONVERT= DO_COPY_TO= DO_CREATE= DO_DIST_INFO= DO_DUMP_CONTENTS= DO_EXISTS= DO_EXTRA= DO_FOLDER= DO_FREEZE= DO_GIT_IGNORE= DO_IGNORE_NEEDS= DO_INSTALL= DO_INTERPRET= DO_LINK_IGNORE= DO_LINK_TO= DO_LIST= DO_LIST_NEEDS= DO_MKDIR= DO_NEEDS= DO_NO_LONGER_NEEDS= DO_PRODUCED_ON= DO_REGISTER= DO_REMOVE= DO_REQUIRED= DO_SET_CACHE_DIR= DO_SUMMARY= DO_SYMLINK_TO= DO_TOUCH= DO_UNINSTALL= DO_UPDATE= DO_UUID= DO_VERSION= DVAR= END_OF_FILE= ENTRY= EVAR= EXTRA= FILE_ARR= FN= FOLDER= FORMAT= FORMAT_CUSTOM= FREEZE_AT= GIT_ID= GITIG= GITIGNORE= GIVAR= INSTALL= INSTALL_DIR= LINE= LINKIG= LINKIGNORE= LINK_TO= LIST= LIVAR= LN_FLAGS= MANIFEST= MVAR= NAME= NAMESPACE= NO_LINK= NO_MKDIR= NO_TOUCH= OLD_CACHE_DIR= PRODUCED_ON= README= RELATIVE_ROOT= REMOTE_GLOBAL_KEY= REMOTE_URL_ROOT= REQUIRED= SEED_FOLDER= SELF= STATUS= SUMMARY= SVAR= TITLE= TVAR= URL= UUID= VALUE= VERBOSE= VERSION_NAME= VERSIONS= 
+	local TMP_FREEZE= DIFF_BEFORE_EXPAND= NEWEST_WHEN_EXPANDING= CHECK_FILE= UNIX_FILE= SCANDIR_LEVEL= ARCHIVE= ARGDUMP= ARR_DEPTH= ARR_ELEMENTS= AT= AUTHORS= AVAR= BINDIR= BLOB= BLOB_NAME= BLOB_ROOT= CACHE_CONFIG= CACHE_DB= CACHE_DIR= CACHE_OPTIONS= CHANGED_DIR= CO= COPY_TYPE= COUNT= CURRENT_FILE_POS= CURRENT_PATH= CURRENT_VERSION= CVAR= DEFAULT_VERSION= DEPENDENCIES= DEP_FOLDER= DESCRIPTION= DIR_ARR= DO_ADD_CACHE_OPTIONS= DO_AUTHORS= DO_CHANGE_DIR= DO_COMMIT= DO_COMMIT_MASTER= DO_CONVERT= DO_COPY_TO= DO_CREATE= DO_DIST_INFO= DO_DUMP_CONTENTS= DO_EXISTS= DO_EXTRA= DO_FOLDER= DO_FREEZE= DO_GIT_IGNORE= DO_IGNORE_NEEDS= DO_INSTALL= DO_INTERPRET= DO_LINK_IGNORE= DO_LINK_TO= DO_LIST= DO_LIST_NEEDS= DO_MKDIR= DO_NEEDS= DO_NO_LONGER_NEEDS= DO_PRODUCED_ON= DO_REGISTER= DO_REMOVE= DO_REQUIRED= DO_SET_CACHE_DIR= DO_SUMMARY= DO_SYMLINK_TO= DO_TOUCH= DO_UNINSTALL= DO_UPDATE= DO_UUID= DO_VERSION= DVAR= END_OF_FILE= ENTRY= EVAR= DO_EXPAND= EXCLUDE= EXPANSION_DIR= EXTRA= FILE_ARR= FN= FOLDER= FORMAT= FORMAT_CUSTOM= FREEZE_AT= GIT_ID= GITIG= GITIGNORE= GIVAR= INSTALL= INSTALL_DIR= LINE= LINKIG= LINKIGNORE= LINK_TO= LIST= LIVAR= LN_FLAGS= MANIFEST= MVAR= NAME= NAMESPACE= NO_LINK= NO_MKDIR= NO_TOUCH= OLD_CACHE_DIR= PRODUCED_ON= README= RELATIVE_ROOT= REMOTE_GLOBAL_KEY= REMOTE_URL_ROOT= REQUIRED= SEED_FOLDER= SELF= STATUS= SUMMARY= SVAR= TITLE= TVAR= URL= UUID= VALUE= VERBOSE= VERSION_NAME= VERSIONS= 
 	
 	# References to $SELF
 	BINDIR="$(dirname "$(readlink -f $0)")"
@@ -184,10 +184,22 @@ function cache () {
 			shift
 		done
 	}
+
+	# Get a file inode or return 1.
+	get_inode() {
+		if [ ! -z "$1" ]
+		then
+			if [ -f "$1" ] || [ -L "$1" ]
+			then
+				ls --inode $1 | awk '{ print $1 }'
+			else
+				printf 0
+			fi
+		else
+			printf 0
+		fi	
+	}
 	
-	
-	
-	# eat_dependencies
 	ARR_ELEMENTS=
 	ARR_DEPTH=20
 	get_position() {
@@ -214,12 +226,10 @@ function cache () {
 	}
 	
 	
-	#declare -a LACK_DEPS
-	#declare -a CHECK_DEPS
-	#declare -a GRAB_DEPS 
 	tmp_file -n LACK_DEPS
 	tmp_file -n CHECK_DEPS
 	tmp_file -n GRAB_DEPS
+	# eat_dependencies
 	eat_dependencies() {
 		# ...
 		[ -f "$1" ] && [[ `in_arr -a ARR_ELEMENTS -t "$1"` == "false" ]] && {
@@ -317,7 +327,7 @@ function cache () {
 			fi	
 		}
 	}
-	
+
 	
 	# usage - Show usage message and die with $STATUS
 	usage() {
@@ -345,6 +355,7 @@ Database stuff:
 -b, --blob <arg>             Select by name. 
 -u, --uuid <arg>             Select by unique identifier. 
 -m, --commit <arg>           Commit changes to a package.
+-p, --expand <arg>           Add additional files in <arg> to cache dir.
 
 Parameter tuning:
     --version <arg>          Select or choose version. 
@@ -371,7 +382,11 @@ Under construction:
     --required <arg>         Define parameters required when making a package.
     --populate <arg>         Populate from somewhere.
     --cd <arg>               Use <arg> as the current cache directory.
-                             (Will fail if .CACHE_DB is not there.)"
+                             (Will fail if .CACHE_DB is not there.)
+    --diff-before            Run a diff before merging.
+    --newest                 Use the newest copy of a file by default when 
+                             expanding.
+"
 	   exit $STATUS
 	}
 	
@@ -557,6 +572,15 @@ Under construction:
 			  shift
 			  BLOB="$1"
 	      ;;
+		  -p|--expand-from)
+			  DO_EXPAND=true
+			  shift
+			  EXPANSION_DIR="$1"
+			;;
+		   --excluding)
+			  shift
+			  EXCLUDE="$1"
+			;;
 	     --required)
 	         DO_REQUIRED=true
 	         shift
@@ -1045,6 +1069,115 @@ AUTHORS=$AUTHORS"
 			done < $FN
 		}
 	}
+
+	# Adding changes and files?
+	[ ! -z $DO_EXPAND ] && {
+		# Both an applicaiton and expansion directory should be supplied.
+		[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "$PROGRAM"
+		[ -z "$EXPANSION_DIR" ] && {
+			error -e 1 -m "No directory specified." -p "$PROGRAM"
+		}
+
+		# Expansion 
+		[ -z "$EXPANSION_DIR" ] && {
+			error -e 1 -m "No directory specified." -p "$PROGRAM"
+		}
+	
+		# Find entry.
+		FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
+	
+		# Is it there?
+		not_exists $BLOB
+
+		# Finally, check that the directory is a real one...
+		EXPANSION_DIR=`get_fullpath $EXPANSION_DIR`
+		[ ! -d "$EXPANSION_DIR" ] && {
+			error -e 1 -m "Directory '$EXPANSION_DIR' does not exist." -p $PROGRAM
+		}
+
+		# Scan the directory and do stuff.
+		SCANDIR_LEVEL=0
+		scan_and_link() {
+			[ -z "$1" ] && error \
+				-m "Argument to scan_and_link() should not be blank.\n" \
+				-p "DEVELOPER" -e 1
+
+			for UNIX_FILE in $(ls --group-directories-first "$1")
+			do
+				if (( $SCANDIR_LEVEL < $ARR_DEPTH ))
+				then
+					UNIX_FILE="$1/$UNIX_FILE"
+					CHECK_FILE="${FOLDER}${UNIX_FILE##${EXPANSION_DIR}}"
+					# echo Folder $FOLDER
+					# echo Dir $EXPANSION_DIR
+					# echo Basefile: "${FOLDER}${UNIX_FILE##${EXPANSION_DIR}}"
+
+					# Directory 
+					if [ -d "$UNIX_FILE" ]
+					then
+						# echo "$UNIX_FILE is a directory."
+						[ ! -d "$CHECK_FILE" ] && mkdir -pv $CHECK_FILE
+						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL + 1 ))
+						scan_and_link "$UNIX_FILE"
+
+					# Link
+					elif [ -L "$UNIX_FILE" ]
+					then
+						# Check if the link is valid.
+						# readlink -f $UNIX_FILE
+
+						# Then link to that file's source.
+						[ ! -L "$CHECK_FILE" ] && ln -sv $UNIX_FILE $CHECK_FILE
+						# echo "$UNIX_FILE is a symbolic link."
+
+					# Regular File
+					elif [ -f "$UNIX_FILE" ]
+					then
+						# Check if the file already exists in the source dir and
+						# is a hard link.
+						# echo $(get_inode $UNIX_FILE) $(get_inode $CHECK_FILE)
+
+						# File is not there, let's link it. 
+						if [ ! -f "$CHECK_FILE" ] 
+						then
+							# echo "$UNIX_FILE has yet to be linked."
+							ln -v $UNIX_FILE $CHECK_FILE
+						# File is there, but not linked for whatever reason.
+						elif [ ! $(get_inode $UNIX_FILE) -eq $(get_inode $CHECK_FILE) ]
+						then
+							# May want to diff these first...
+							# Or check their last updated times.
+							rm -fv $CHECK_FILE
+							ln -v $UNIX_FILE $CHECK_FILE
+						fi	
+
+						# Hard link it if it does not exist (dependent on how
+						# you want to maintain the file too...)
+						# echo "$UNIX_FILE is a file."
+
+					# Device files, and other ridiculous shit...
+					else
+						[ -z $VERBOSE ] && {
+							{
+								printf "$UNIX_FILE is neither a regular file "
+								printf "nor a directory.\n" 
+							} >> /dev/stderr
+						}
+					fi
+				else
+					error \
+						-m "The directory structure is too deep for the limit imposed." \
+						-p "$PROGRAM" -e 1
+					exit 1
+				fi
+			done
+		}
+
+		# Run this
+		scan_and_link "$EXPANSION_DIR"
+		# unset UNIX_FILE CHECK_FILE SCANDIR_LEVEL
+		UNIX_FILE= CHECK_FILE= SCANDIR_LEVEL=0
+	}
 	
 	
 	# Commit
@@ -1254,11 +1387,81 @@ AUTHORS=$AUTHORS"
 	
 		# Do a find on the directory where the file is?
 		FREEZE_AT="`get_fullpath $FREEZE_AT`"
-	
-		# Seems you can just totally delete this, and remake it. 
-		# Linking it could be tough though.
-		rm -rf $FREEZE_AT/*
-		cp -rv $FOLDER/* $FREEZE_AT
+
+		echo $FOLDER
+		echo $FREEZE_AT
+
+		# Freeze what's in the folder currently.
+		# rm -rf $FREEZE_AT/*
+		# cp -rv $FOLDER/* $FREEZE_AT
+		SCANDIR_LEVEL=0
+		scan_and_freeze() {
+			[ -z "$1" ] && error \
+				-m "Argument to scan_and_freeze() should not be blank.\n" \
+				-p "DEVELOPER" -e 1
+
+			for UNIX_FILE in $(ls --group-directories-first "$1")
+			do
+				if (( $SCANDIR_LEVEL < $ARR_DEPTH ))
+				then
+					UNIX_FILE="$1/$UNIX_FILE"
+					CHECK_FILE="${FOLDER}${UNIX_FILE##${FREEZE_AT}}"
+
+					# Link
+					if [ -L "$UNIX_FILE" ]
+					then
+						# Check if the link is valid.
+						TMP_FREEZE="`readlink -f $UNIX_FILE`"
+						
+						# Copy whatever the original file is, destroying the link.
+						if [ -d "$TMP_FREEZE" ] 
+						then 
+							rm -rfv $UNIX_FILE  
+							mkdir $UNIX_FILE
+							cp -rv $TMP_FREEZE $UNIX_FILE
+						elif [ -f "$TMP_FREEZE" ]
+						then
+							rm -fv $UNIX_FILE
+							touch $UNIX_FILE
+							cat $TMP_FREEZE > $UNIX_FILE
+						fi	
+
+					# Directory 
+					elif [ -d "$UNIX_FILE" ]
+					then
+						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL + 1 ))
+						scan_and_freeze "$UNIX_FILE"
+
+					# Regular File
+					elif [ -f "$UNIX_FILE" ]
+					then
+						# File is there and hardlinked.  Make a fresh copy. 
+						echo "Current dir file: $(get_inode $UNIX_FILE) $UNIX_FILE"
+						echo "Cache dir file:   $(get_inode $CHECK_FILE) $CHECK_FILE"
+
+						if [ -f "$CHECK_FILE" ] && [ $(get_inode $UNIX_FILE) -eq $(get_inode $CHECK_FILE) ]
+						then
+							# May want to diff first or check last updated times of files.
+							rm -fv $UNIX_FILE
+							touch $UNIX_FILE
+							# echo cp -v $CHECK_FILE $UNIX_FILE 
+							cat $CHECK_FILE > $UNIX_FILE 
+						fi	
+					fi
+				else
+					error \
+						-m "The directory structure is too deep for the limit imposed." \
+						-p "$PROGRAM" -e 1
+					exit 1
+				fi
+			done
+		}
+
+		# Freeze the directory.
+		scan_and_freeze "$FREEZE_AT"
+		echo '...'
+		UNIX_FILE= CHECK_FILE= SCANDIR_LEVEL=
+		# unset UNIX_FILE CHECK_FILE SCANDIR_LEVEL
 	}
 	
 	
@@ -1351,7 +1554,7 @@ AUTHORS=$AUTHORS"
 			# If this is the first time something has been added, it's possible
 			# that there will be no *CURRENT branch.  So we use *INITIAL instead.
 			# Version selection should be done here too.
-			[ -z `git branch | sed -n '/* master/p'` ] && git checkout master
+			[ -z "`git branch | sed -n '/* master/p'`" ] && git checkout master
 			#if [ -z "`sed -n '/*CURRENT/p' $BLOB_ROOT/VERSIONS`" ]
 			#then
 			#	git checkout `sed -n '$p' $BLOB_ROOT/VERSIONS | awk -F '|' '{ print $2 }'`
@@ -1396,5 +1599,5 @@ AUTHORS=$AUTHORS"
 	
 	# Clean up.
 	tmp_file -w
-	unset ARCHIVE ARGDUMP ARR_DEPTH ARR_ELEMENTS AT AUTHORS AVAR BINDIR BLOB BLOB_NAME BLOB_ROOT CACHE_CONFIG CACHE_DB CACHE_DIR CACHE_OPTIONS CHANGED_DIR CO COPY_TYPE COUNT CURRENT_FILE_POS CURRENT_PATH CURRENT_VERSION CVAR DEFAULT_VERSION DEPENDENCIES DEP_FOLDER DESCRIPTION DIR_ARR DO_ADD_CACHE_OPTIONS DO_AUTHORS DO_CHANGE_DIR DO_COMMIT DO_COMMIT_MASTER DO_CONVERT DO_COPY_TO DO_CREATE DO_DIST_INFO DO_DUMP_CONTENTS DO_EXISTS DO_EXTRA DO_FOLDER DO_FREEZE DO_GIT_IGNORE DO_IGNORE_NEEDS DO_INSTALL DO_INTERPRET DO_LINK_IGNORE DO_LINK_TO DO_LIST DO_LIST_NEEDS DO_MKDIR DO_NEEDS DO_NO_LONGER_NEEDS DO_PRODUCED_ON DO_REGISTER DO_REMOVE DO_REQUIRED DO_SET_CACHE_DIR DO_SUMMARY DO_SYMLINK_TO DO_TOUCH DO_UNINSTALL DO_UPDATE DO_UUID DO_VERSION DVAR END_OF_FILE ENTRY EVAR EXTRA FILE_ARR FN FOLDER FORMAT FORMAT_CUSTOM FREEZE_AT GIT_ID GITIG GITIGNORE GIVAR INSTALL INSTALL_DIR LINE LINKIG LINKIGNORE LINK_TO LIST LIVAR LN_FLAGS MANIFEST MVAR NAME NAMESPACE NO_LINK NO_MKDIR NO_TOUCH OLD_CACHE_DIR PRODUCED_ON PROGRAM README RELATIVE_ROOT REMOTE_GLOBAL_KEY REMOTE_URL_ROOT REQUIRED SEED_FOLDER SELF STATUS SUMMARY SVAR TITLE TVAR URL UUID VALUE VERBOSE VERSION_NAME VERSIONS
+	unset TMP_FREEZE UNIX_FILE CHECK_FILE SCANDIR_LEVEL ARCHIVE ARGDUMP ARR_DEPTH ARR_ELEMENTS AT AUTHORS AVAR BINDIR BLOB BLOB_NAME BLOB_ROOT CACHE_CONFIG CACHE_DB CACHE_DIR CACHE_OPTIONS CHANGED_DIR CO COPY_TYPE COUNT CURRENT_FILE_POS CURRENT_PATH CURRENT_VERSION CVAR DEFAULT_VERSION DEPENDENCIES DEP_FOLDER DESCRIPTION DIR_ARR DO_ADD_CACHE_OPTIONS DO_AUTHORS DO_CHANGE_DIR DO_COMMIT DO_COMMIT_MASTER DO_CONVERT DO_COPY_TO DO_CREATE DO_DIST_INFO DO_DUMP_CONTENTS DO_EXISTS DO_EXTRA DO_FOLDER DO_FREEZE DO_GIT_IGNORE DO_IGNORE_NEEDS DO_INSTALL DO_INTERPRET DO_LINK_IGNORE DO_LINK_TO DO_LIST DO_LIST_NEEDS DO_MKDIR DO_NEEDS DO_NO_LONGER_NEEDS DO_PRODUCED_ON DO_REGISTER DO_REMOVE DO_REQUIRED DO_SET_CACHE_DIR DO_SUMMARY DO_SYMLINK_TO DO_TOUCH DO_UNINSTALL DO_UPDATE DO_UUID DO_VERSION DVAR END_OF_FILE ENTRY EVAR EXTRA FILE_ARR FN FOLDER FORMAT FORMAT_CUSTOM FREEZE_AT GIT_ID GITIG GITIGNORE GIVAR INSTALL INSTALL_DIR LINE LINKIG LINKIGNORE LINK_TO LIST LIVAR LN_FLAGS MANIFEST MVAR NAME NAMESPACE NO_LINK NO_MKDIR NO_TOUCH OLD_CACHE_DIR PRODUCED_ON PROGRAM README RELATIVE_ROOT REMOTE_GLOBAL_KEY REMOTE_URL_ROOT REQUIRED SEED_FOLDER SELF STATUS SUMMARY SVAR TITLE TVAR URL UUID VALUE VERBOSE VERSION_NAME VERSIONS
 }
