@@ -630,9 +630,9 @@ Under construction:
 	[ ! -z $DO_UNINSTALL ] && init --uninstall
 	
 	
-	# Always should have a configuration file.
+	# CACHE_CONFIG="${CACHE_CONFIG:-$BINDIR/.CACHE}"
 	CACHE_CONFIG="$BINDIR/.CACHE"
-	
+
 	# Set a cache directory first.
 	[ ! -z $DO_SET_CACHE_DIR ] && {
 		# Was a cache directory given?
@@ -666,7 +666,6 @@ Under construction:
 		}
 	}
 	
-	
 	# Generate a configuration file.
 	if [ ! -f "$CACHE_CONFIG" ]
 	then
@@ -689,8 +688,17 @@ REMOTE_GLOBAL_KEY=$REMOTE_GLOBAL_KEY" > $CACHE_CONFIG
 	
 	# Grab the CACHE_CONFIG
 	source $CACHE_CONFIG
+
+	# Always should have a configuration file.
+	[ ! -z $DO_CHANGE_DIR ] && {
+		[ -d "$CHANGED_DIR" ] && [ -f "$CHANGED_DIR/.CACHE_DB" ] && {
+			CACHE_DIR="$CHANGED_DIR"
+			CACHE_DB="$CHANGED_DIR/.CACHE_DB"
+		}
+	}
+
 	CACHE_OPTIONS="$CACHE_DIR/.CACHE_OPTIONS"
-	
+
 	# Not sure why we have to create a database everytime, but it should be there.
 	[ ! -f "$CACHE_DB" ] && touch $CACHE_DB
 		
@@ -1120,6 +1128,7 @@ AUTHORS=$AUTHORS"
 						[ ! -d "$CHECK_FILE" ] && mkdir -pv $CHECK_FILE
 						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL + 1 ))
 						scan_and_link "$UNIX_FILE"
+						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL - 1 ))
 
 					# Link
 					elif [ -L "$UNIX_FILE" ]
@@ -1432,6 +1441,7 @@ AUTHORS=$AUTHORS"
 					then
 						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL + 1 ))
 						scan_and_freeze "$UNIX_FILE"
+						SCANDIR_LEVEL=$(( $SCANDIR_LEVEL - 1 ))
 
 					# Regular File
 					elif [ -f "$UNIX_FILE" ]
