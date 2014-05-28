@@ -143,7 +143,7 @@ function cache () {
 	
 	
 	# Choose from array, this is VERY bad programming.  Stop being lazy.
-	SVAR= DVAR= GIVAR= LIVAR= EVAR= MVAR= TVAR= CVAR= 
+	SVAR= DVAR= GIVAR= LIVAR= EVAR= MVAR= TVAR= CVAR= EXVAR=
 	save_args() {
 		while [ $# -gt 0 ]
 		do
@@ -155,6 +155,7 @@ function cache () {
 				-li) 	shift; LIVAR="$LIVAR\n$1";;
 				-ex) 	shift; EVAR="$EVAR\n$1";;
 				-dir) shift; MVAR="$MVAR\n$1";;
+				-exclude) shift; EXVAR="$EXVAR\n$1";;
 				-file) shift; TVAR="$TVAR\n$1";;
 				-depchain) shift; CVAR="$CVAR\n$1";;
 				-dump)
@@ -167,6 +168,7 @@ function cache () {
 						gi) TERM="$GIVAR" ;;
 						li) TERM="$LIVAR" ;;
 						ex) TERM="$EVAR" ;;
+						exclude) TERM="$EXVAR" ;;
 						dir) TERM="$MVAR" ;;
 						depchain) TERM="$CVAR" ;;
 						file) TERM="$TVAR" ;;
@@ -357,6 +359,8 @@ Database stuff:
 -m, --commit <arg>           Commit changes to a package.
 -p, --push-from <arg>        Push additional files in <arg> to 
                              application directory selected by --blob.
+    --exclude <arg>          Define files or folders for exclusions (takes
+	                          multiple flags.)
 
 Parameter tuning:
     --version <arg>          Select or choose version. 
@@ -578,9 +582,9 @@ Under construction:
 			  shift
 			  EXPANSION_DIR="$1"
 			;;
-		   --excluding)
+		   --exclude)
 			  shift
-			  EXCLUDE="$1"
+			  EXCLUDE="$1" 
 			;;
 	     --required)
 	         DO_REQUIRED=true
@@ -1081,31 +1085,39 @@ AUTHORS=$AUTHORS"
 
 	# Adding changes and files?
 	[ ! -z $DO_EXPAND ] && {
-		# Both an applicaiton and expansion directory should be supplied.
-		[ -z "$BLOB" ] && error -e 1 -m "No application specified." -p "$PROGRAM"
-		[ -z "$EXPANSION_DIR" ] && {
-			error -e 1 -m "No directory specified." -p "$PROGRAM"
-		}
+		# At least, an expansion directory should be supplied.
+		[ -z "$EXPANSION_DIR" ] && error -e 1 -m "No directory specified." -p "$PROGRAM"
+	
+		# Finally, check that the directory is a real one...
+		EXPANSION_DIR="`get_fullpath $EXPANSION_DIR`"
+		if [ -d "$EXPANSION_DIR" ]
+		then
+			# Search for the blob name.
+			if [ -z "$BLOB" ] 
+			then
+				if [ -f "$EXPANSION_DIR/MANIFEST" ]
+				then
+					UUID="`sed -n "s/^UUID=//p" $EXPANSION_DIR/MANIFEST`"
+					BLOB="`sed -n "/^$UUID|/p" $CACHE_DB | awk -F '|' '{ print $2 }'`"
+				else
+					error -e 1 -p "$PROGRAM" \
+						-m "No application manifest found at '$EXPANSION_DIR'.\nTo merge this code, you'll have to specify the application that its for.\n" 
+				fi
+			fi	
+		else
+			# Die if not.
+			error -e 1 -m "Directory '$EXPANSION_DIR' does not exist." -p $PROGRAM
+		fi	
 
-		# Expansion 
-		[ -z "$EXPANSION_DIR" ] && {
-			error -e 1 -m "No directory specified." -p "$PROGRAM"
-		}
-	
-		# Find entry.
-		FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
-	
-		# Is it there?
+		# Check that this on the system somewhere.
 		not_exists $BLOB
 
-		# Finally, check that the directory is a real one...
-		EXPANSION_DIR=`get_fullpath $EXPANSION_DIR`
-		[ ! -d "$EXPANSION_DIR" ] && {
-			error -e 1 -m "Directory '$EXPANSION_DIR' does not exist." -p $PROGRAM
-		}
+		# Find entry.
+		FOLDER="$CACHE_DIR/$(grep --line-number "|$BLOB|" $CACHE_DB | sed 's/|/:/g' | awk -F ':' '{ print $4 }')"
 
 		# Scan the directory and do stuff.
 		SCANDIR_LEVEL=0
+		EXCLUSION=
 		scan_and_link() {
 			[ -z "$1" ] && error \
 				-m "Argument to scan_and_link() should not be blank.\n" \
@@ -1113,6 +1125,17 @@ AUTHORS=$AUTHORS"
 
 			for UNIX_FILE in $(ls --group-directories-first "$1")
 			do
+				# Exclude what you don't need.
+				[ ! -z "$EXCLUDE" ] && {
+					# Does not let you get specific about directories...
+					for UNIX_TERM in $(printf $EXCLUDE | sed 's#,# #g')
+					do
+						# Jump to $UNIX_FILE loop.
+						[[ "$UNIX_TERM" == "$UNIX_FILE" ]] && continue 2 	
+					done
+				}
+
+				# Only move forward if your depth is in the right place.
 				if (( $SCANDIR_LEVEL < $ARR_DEPTH ))
 				then
 					UNIX_FILE="$1/$UNIX_FILE"
@@ -1186,7 +1209,7 @@ AUTHORS=$AUTHORS"
 		# Run this
 		scan_and_link "$EXPANSION_DIR"
 		# unset UNIX_FILE CHECK_FILE SCANDIR_LEVEL
-		UNIX_FILE= CHECK_FILE= SCANDIR_LEVEL=0
+		UNIX_FILE= CHECK_FILE= SCANDIR_LEVEL=0 EXCLUSION=
 	}
 	
 	
@@ -1537,11 +1560,11 @@ AUTHORS=$AUTHORS"
 	
 		# Show me what's been selected.
 		save_args -dump depchain | {
-		FN="`cat /dev/stdin`"
-		while read line	
-		do
-			printf "$line\n" | sed 's/|/\t/'
-		done < $FN
+			FN="`cat /dev/stdin`"
+			while read line	
+			do
+				printf "$line\n" | sed 's/|/\t/'
+			done < $FN
 		}
 	
 		# Dump all dependencies and go through and add them in.
